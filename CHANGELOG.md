@@ -1,9 +1,14 @@
 # Changelog
 
-Release notes are generated from commit history with `git-cliff`.
+Notable changes to this ESP32 companion.
 
-## Unreleased
+## [v0.1.0]
 
-- Expressive, smoothly animated ESP32 desktop companion.
-- Losslessly compressed graphics and read-only microSD support.
-- Matched firmware and SD-card release bundles.
+### Features and improvements
+
+- Create ESP32 Copilot firmware and sprite review studio
+
+- Add polished character reactions and full-height working animation
+
+- Add compact sprites, microSD support, and release automation
+
