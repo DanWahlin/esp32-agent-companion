@@ -7,3 +7,4 @@ __pycache__/
 .env.*
 !.env.example
 firmware/Copilot/generated/atlas_bytes.h
+firmware/Copilot/generated/sprite_bytes.h

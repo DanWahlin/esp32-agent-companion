@@ -28,6 +28,11 @@ def build_renderer():
     return executable
 
 
+def build_character_renderer():
+    subprocess.run(["bash", str(ROOT / "tools/build_character_preview.sh")], check=True)
+    return ROOT / "build/character-preview"
+
+
 class NativeRenderer:
     def __init__(self, executable):
         self.process = subprocess.Popen(
@@ -85,7 +90,8 @@ class NativeRenderer:
 
     def close(self):
         with self.lock:
-            self.process.terminate()
+            if self.process.poll() is None:
+                self.process.terminate()
             try:
                 self.process.wait(timeout=3)
             except subprocess.TimeoutExpired:
@@ -96,38 +102,92 @@ class NativeRenderer:
                 self.process.stdout.close()
 
 
+class NativeCharacterRenderer(NativeRenderer):
+    def frame(self, payload):
+        if not isinstance(payload, dict):
+            raise ValueError("Request must be a JSON object.")
+        delta = payload.get("delta", 0)
+        mode = payload.get("mode", -1)
+        playing = payload.get("playing", True)
+        if type(delta) not in (int, float) or not math.isfinite(delta) or not 0 <= delta <= 86400:
+            raise ValueError("delta must be a finite number between zero and 86400.")
+        if type(mode) is not int or not -1 <= mode <= 4:
+            raise ValueError("Character mode must be -1 (unchanged) or 0..4.")
+        if type(playing) is not bool:
+            raise ValueError("playing must be a boolean.")
+        if not self.lock.acquire(blocking=False):
+            raise RuntimeError("A frame is already in flight for this character session.")
+        try:
+            if self.process.poll() is not None:
+                raise RuntimeError("Character renderer is no longer running.")
+            self.process.stdin.write(f"{delta:.12f} {mode} {int(playing)}\n".encode("ascii"))
+            deadline = time.monotonic() + 5
+            header = bytearray()
+            while not header.endswith(b"\n") and len(header) < 1024:
+                header.extend(self.read(1, deadline))
+            text = header.decode("ascii").strip()
+            if text.startswith("ERR "):
+                raise ValueError(text[4:])
+            fields = text.split()
+            if len(fields) != 12 or fields[0] != "OK" or fields[1] != "372800":
+                self.process.terminate()
+                raise RuntimeError("Invalid native character frame header.")
+            pixels = self.read(int(fields[1]), deadline)
+            names = ("direction", "index", "blink", "mode", "requestedMode", "effectSeconds",
+                     "eventId", "renderMs", "availableDirections", "playing")
+            return pixels, dict(zip(names, fields[2:]))
+        except (TimeoutError, BrokenPipeError):
+            if self.process.poll() is None:
+                self.process.terminate()
+            raise
+        finally:
+            self.lock.release()
+
+
 class RendererSessions:
-    def __init__(self, executable):
+    def __init__(self, executable, renderer_type=NativeRenderer):
         self.executable = executable
+        self.renderer_type = renderer_type
         self.instances = {}
         self.lock = threading.Lock()
+        self.closed = False
 
     def get(self, session):
         if not isinstance(session, str) or not re.fullmatch(r"[a-zA-Z0-9-]{1,64}", session):
             raise ValueError("A valid browser session is required.")
         with self.lock:
+            if self.closed:
+                raise RuntimeError("Preview sessions are shutting down.")
             if session not in self.instances:
                 if len(self.instances) >= 8:
                     raise RuntimeError("Eight previews are already open. Close an unused preview first.")
-                self.instances[session] = NativeRenderer(self.executable)
+                self.instances[session] = self.renderer_type(self.executable)
             return self.instances[session]
 
     def close(self, session):
         with self.lock:
             instance = self.instances.pop(session, None)
-        if instance:
-            instance.close()
+            if instance:
+                instance.close()
 
     def close_all(self):
-        for session in list(self.instances):
-            self.close(session)
+        with self.lock:
+            self.closed = True
+            instances = list(self.instances.values())
+            self.instances.clear()
+        for instance in instances:
+            instance.close()
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--skip-build", action="store_true", help="Use explicitly prebuilt native binaries.")
     args = parser.parse_args()
-    sessions = RendererSessions(build_renderer())
+    sessions = RendererSessions(ROOT / "build/live-preview" if args.skip_build else build_renderer())
+    characters = RendererSessions(
+        ROOT / "build/character-preview" if args.skip_build else build_character_renderer(),
+        NativeCharacterRenderer)
 
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *arguments, **keywords):
@@ -138,29 +198,31 @@ def main():
                 super().log_message(format_string, *arguments)
 
         def do_POST(self):
-            if self.path not in ("/api/frame", "/api/close"):
+            if self.path not in ("/api/frame", "/api/close", "/api/character/frame", "/api/character/close"):
                 self.send_error(404)
                 return
             try:
+                self.connection.settimeout(5)
                 size = int(self.headers.get("Content-Length", "0"))
                 if size <= 0 or size > 4096:
                     raise ValueError("Invalid request size.")
                 payload = json.loads(self.rfile.read(size))
                 if not isinstance(payload, dict):
                     raise ValueError("Request must be a JSON object.")
-                if self.path == "/api/close":
+                selected = characters if self.path.startswith("/api/character/") else sessions
+                if self.path.endswith("/close"):
                     session = payload.get("session")
                     if not isinstance(session, str):
                         raise ValueError("Browser session is required.")
-                    sessions.close(session)
+                    selected.close(session)
                     self.send_response(204)
                     self.end_headers()
                     return
-                pixels, metadata = sessions.get(payload.get("session")).frame(payload)
+                pixels, metadata = selected.get(payload.get("session")).frame(payload)
             except (ValueError, json.JSONDecodeError) as error:
                 self.send_error(400, str(error))
                 return
-            except (RuntimeError, TimeoutError, BrokenPipeError) as error:
+            except (RuntimeError, OSError) as error:
                 self.send_error(503, str(error))
                 return
             self.send_response(200)
@@ -180,6 +242,7 @@ def main():
         pass
     finally:
         sessions.close_all()
+        characters.close_all()
 
 
 if __name__ == "__main__":

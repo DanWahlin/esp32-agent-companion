@@ -5,10 +5,87 @@ from pathlib import Path
 import re
 import time
 import os
+import math
 if os.name == "posix":
     import termios
 
 import serial
+
+MEMORY_FIELDS = (
+    "free_internal", "min_internal", "largest_internal", "free_psram",
+    "render_stack_free", "display_stack_free",
+)
+CHARACTER_MODES = ("idle", "surprise", "working", "complete", "attention")
+
+
+def request_mode(port, mode):
+    if mode not in CHARACTER_MODES:
+        raise ValueError(f"Unknown character mode: {mode}")
+    # Negotiate before sending a packet: older firmware interprets standalone 's' as capture.
+    port.write(b"i")
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        line = port.readline().decode("utf-8", errors="replace").strip()
+        if line.startswith("INFO protocol="):
+            match = re.match(r"INFO protocol=(\d+)(?: |$)", line)
+            if not match or int(match.group(1)) != 1:
+                raise RuntimeError(f"Unsupported device command protocol: {line}")
+            print(line, flush=True)
+            break
+        if any(marker in line for marker in ("FATAL", "Guru Meditation", "abort()")):
+            raise RuntimeError(f"Device command negotiation failed: {line}")
+    else:
+        raise TimeoutError("Device has no compatible character-command protocol; no mode command was sent.")
+    port.write(f"!{mode}\n".encode("ascii"))
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        line = port.readline().decode("utf-8", errors="replace").strip()
+        if line == f"COMMAND accepted={mode}":
+            print(line, flush=True)
+            return
+        if any(marker in line for marker in ("COMMAND_ERROR", "FATAL", "Guru Meditation", "abort()")):
+            raise RuntimeError(f"Device rejected the mode command: {line}")
+    raise TimeoutError(f"No acknowledgement for {mode}.")
+
+
+def parse_memory(line):
+    if not line.startswith("MEM "):
+        return None
+    fields = line.split()[1:]
+    if any(re.fullmatch(r"[a-z_]+=\d+", field) is None for field in fields):
+        raise RuntimeError(f"Malformed memory telemetry: {line}")
+    result = {key: int(value) for key, value in (field.split("=") for field in fields)}
+    if len(result) != len(fields) or set(result) != set(MEMORY_FIELDS):
+        raise RuntimeError(f"Unexpected memory telemetry fields: {line}")
+    return result
+
+
+def validate_memory(samples, tolerance=0):
+    if len(samples) < 3:
+        raise RuntimeError("At least three MEM reports are required to check memory stability.")
+    for field in ("free_internal", "largest_internal", "free_psram"):
+        values = [sample[field] for sample in samples]
+        if max(values) - min(values) > tolerance:
+            raise RuntimeError(
+                f"Memory varied: {field}={min(values)}..{max(values)} bytes "
+                f"(allowed {tolerance}). Investigate; variation alone does not establish a leak."
+            )
+    for field, minimum in (("min_internal", 8192), ("render_stack_free", 1024), ("display_stack_free", 1024)):
+        if min(sample[field] for sample in samples) < minimum:
+            raise RuntimeError(f"Insufficient {field} headroom; require at least {minimum} bytes.")
+
+
+def check_heap_integrity(port):
+    port.write(b"h")
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        line = port.readline().decode("utf-8", errors="replace").strip()
+        if line == "HEAP integrity=ok":
+            print("PASS: on-device heap integrity", flush=True)
+            return
+        if any(marker in line for marker in ("FATAL", "CORRUPT", "Guru Meditation", "assert failed", "watchdog")):
+            raise RuntimeError(f"Heap diagnostic failed: {line}")
+    raise TimeoutError("No heap integrity acknowledgement from the device.")
 
 
 class NonResettingSerial(serial.Serial):
@@ -51,10 +128,12 @@ def capture(port, destination):
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
         line = port.readline()
+        if line.startswith((b"CAPTURE_POSE ", b"CAPTURE_STATE ")):
+            print(line.decode("ascii").strip(), flush=True)
         if line.startswith(b"FRAME_BE "):
             _, width, height, size = line.decode("ascii").split()
             width, height, size = int(width), int(height), int(size)
-            if (width, height, size) != (400, 352, 281600):
+            if (width, height, size) not in ((400, 352, 281600), (400, 466, 372800)):
                 raise RuntimeError(f"Unexpected framebuffer header: {line!r}")
             raw = bytearray()
             while len(raw) < size and time.monotonic() < deadline:
@@ -69,7 +148,7 @@ def capture(port, destination):
                 (pixels & 31) * 255 // 31,
             ], axis=-1).astype(np.uint8)
             image = Image.new("RGB", (466, 466))
-            image.paste(Image.fromarray(rgb), (33, 57))
+            image.paste(Image.fromarray(rgb), (33, (466-height)//2))
             image.save(destination)
             print(f"Captured device framebuffer: {destination}")
             return
@@ -85,32 +164,68 @@ def main():
     parser.add_argument("--min-fps", type=float, default=29)
     parser.add_argument("--capture", type=Path)
     parser.add_argument("--log", type=Path)
+    parser.add_argument("--mode", choices=CHARACTER_MODES, help="Send a character event before observation.")
+    parser.add_argument("--warmup-seconds", type=float, default=0,
+                        help="Log, but exclude, this initial interval before the measured interval.")
+    parser.add_argument("--check-memory", action="store_true")
+    parser.add_argument("--memory-tolerance", type=int, default=0,
+                        help="Allowed peak-to-trough heap variation in bytes (default: exact stability).")
+    parser.add_argument("--max-gap-ms", type=float, help="Maximum interval between frame presentations.")
     args = parser.parse_args()
-    if args.seconds < 6:
+    if not math.isfinite(args.seconds) or args.seconds < 6:
         parser.error("--seconds must be at least 6 to receive a PERF report")
+    if not math.isfinite(args.min_fps) or args.min_fps <= 0:
+        parser.error("--min-fps must be finite and positive.")
+    if not math.isfinite(args.warmup_seconds) or args.warmup_seconds < 0 or args.memory_tolerance < 0:
+        parser.error("Warmup and memory tolerance must be finite and nonnegative.")
+    if args.max_gap_ms is not None and (not math.isfinite(args.max_gap_ms) or args.max_gap_ms <= 0):
+        parser.error("--max-gap-ms must be finite and positive.")
     if os.name != "posix":
         parser.error("Non-resetting observation currently supports macOS and Linux.")
     port = NonResettingSerial(port=None, baudrate=115200, timeout=0.5)
     port.port = args.port
-    lines, rates = [], []
+    lines, rates, memory, gaps = [], [], [], []
     try:
         port.open()
-        deadline = time.monotonic() + args.seconds
+        if args.mode:
+            request_mode(port, args.mode)
+        measured_start = time.monotonic() + args.warmup_seconds
+        deadline = measured_start + args.seconds
         while time.monotonic() < deadline:
             line = port.readline().decode("utf-8", errors="replace").strip()
             if not line:
                 continue
-            print(line, flush=True)
-            lines.append(line)
-            if any(marker in line for marker in ("FATAL", "Guru Meditation", "assert failed", "Task watchdog")):
+            warming = time.monotonic() < measured_start
+            logged = f"[warmup] {line}" if warming else line
+            print(logged, flush=True)
+            lines.append(logged)
+            if any(marker in line for marker in ("FATAL", "Guru Meditation", "assert failed", "Task watchdog", "abort()")):
                 raise RuntimeError(f"Device runtime error: {line}")
-            match = re.search(r"PERF fps=([\d.]+)", line)
+            if warming:
+                continue
+            match = re.fullmatch(r"PERF fps=([\d.]+) .+", line)
             if match:
                 rates.append(float(match.group(1)))
+            sample = parse_memory(line)
+            if sample is not None:
+                memory.append(sample)
+            match = re.fullmatch(r"PACING min_gap_us=(\d+) max_gap_us=(\d+)", line)
+            if match:
+                gaps.append(int(match.group(2)))
         if not rates:
             raise RuntimeError("No PERF reports received; device operation is not verified.")
         if min(rates) < args.min_fps:
             raise RuntimeError(f"Measured {min(rates):.1f} fps, below {args.min_fps:.1f} fps threshold.")
+        if args.max_gap_ms is not None:
+            if not gaps:
+                raise RuntimeError("No PACING telemetry received.")
+            if max(gaps) > args.max_gap_ms * 1000:
+                raise RuntimeError(f"Frame presentation gap {max(gaps) / 1000:.3f} ms exceeds {args.max_gap_ms:.3f} ms.")
+            print(f"PASS: maximum presentation gap {max(gaps) / 1000:.3f} ms")
+        if args.check_memory:
+            validate_memory(memory, args.memory_tolerance)
+            print(f"PASS: {len(memory)} stable memory reports; sufficient internal heap and stack headroom")
+            check_heap_integrity(port)
         print(f"PASS: {len(rates)} reports, {min(rates):.1f}-{max(rates):.1f} fps")
         if args.capture:
             capture(port, args.capture)

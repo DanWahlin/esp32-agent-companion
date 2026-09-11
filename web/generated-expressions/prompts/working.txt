@@ -1,0 +1,39 @@
+Create one polished production sprite sheet for the expression 'working'.
+
+Image 1 is the EXACT approved front-center character. Image 2 is a placement and
+identity guide showing that same neutral head in all 24 slots. Edit those heads
+into 24 successive rendered states of ONE identical rigid character. This is a
+professional technical-animation asset sheet, not a collage of redesigned heads.
+
+OUTPUT: 1536x1024 PNG, high quality. Exactly SIX columns and FOUR rows, 24 complete
+separate heads in reading order. Keep the guide's exact centers and generous
+proper margins. Each head is approximately 200 pixels wide and 158 pixels high,
+with fixed camera scale. Solid pure BLACK background. Ensure all content is fully
+visible. REMOVE ALL guide lines, captions, numbers and text in the final artwork.
+No labels, letters, question marks, punctuation, icons, particles, confetti,
+fireworks, stars, sparkles, hands, arms, body, pedestal, floor or cast shadows.
+
+IDENTITY LOCK: preserve the reference's glossy blue/violet smooth helmet dome,
+two thick cyan/cobalt rounded-square goggles perched ABOVE the faceplate, the
+goggles' dark saturated-blue inset lenses, separate dark-blue faceplate below
+them, pale blue/violet curved visor rim, and rounded blue/violet ear pods.
+The goggles and shell are RIGID and IDENTICAL in every frame, with the same
+proportions, silhouette, material, bevels, illumination and recessed lenses.
+NEVER use the large goggle lenses as expressive eyes. The ONLY expressive eyes
+are the TWO SMALL LUMINOUS CYAN MARKS in the LOWER FACEPLATE below the goggles.
+Do not add a mouth, nose, eyebrows, hair, teeth or any facial feature.
+Retain clean subtle glossy gradients without grain, stipple or texture changes.
+
+EXPRESSION: A calm, focused thinking expression while a coding assistant works. The TWO SMALL CYAN EYES IN THE LOWER FACEPLATE gradually squint into shorter softly rounded horizontal capsules, about half their original height, without angry slanted eyebrows. Their cyan gaze shifts only 2 pixels to the viewer's right. Add a gentle 3-degree clockwise rigid head roll and at most 2 degrees of downward pitch. This is absorbed, friendly concentration, not sadness, sleepiness, anger or stress.
+
+TEMPORAL PLAN: frame 00 is exactly the neutral reference. Progress steadily and
+very gradually toward 'focused short cyan eyes; subtle thinking tilt' at frame 23. The changes per adjacent
+frame are tiny, with no jump at row boundaries. Row 1 covers expression strength
+0-22%, row 2 26-48%, row 3 52-74%, row 4 78-100%. No animation restart in a new row.
+Do not make all frames reach the final emotion immediately. No surprise extra
+expressions between frames. Never rotate the head more than 6 degrees total.
+
+Render each frame as a clean discrete view, NOT a blend or morph. No double
+outlines, melting goggles, stretchy visor rims, squash/stretch, changes in ear
+size, camera zoom, head shrinking or lighting changes. The head must remain
+instantly recognizable as the exact approved mascot in image 1.

@@ -2,32 +2,60 @@
 #include <Arduino_GFX_Library.h>
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
+#include <esp_system.h>
 #include <miniz.h>
 #include <algorithm>
 #include <cstring>
-#include "src/AtlasRenderer.h"
-#include "src/AnimationClock.h"
+#include <cstdarg>
+#include <atomic>
+#include "src/SpriteRenderer.h"
+#include "src/SpriteStorage.h"
+#include "src/CharacterMotion.h"
+#include "src/CharacterEffects.h"
+#include "src/DeviceCommands.h"
+#include "src/TouchInput.h"
+#include "src/Motion.h"
 
 using namespace copilot;
 
 namespace {
 Arduino_ESP32QSPI displayBus(12, 38, 4, 5, 6, 7);
 Arduino_CO5300 display(&displayBus, 39, 0, 466, 466, 6, 0, 0, 0);
-QueueHandle_t freeFrames, readyFrames;
-AtlasRenderer* renderer;
+QueueHandle_t freeFrames, readyFrames, commands;
+TaskHandle_t renderTask;
+SpriteRenderer* renderer;
+CharacterEffects* effects;
 tinfl_decompressor inflater;
 constexpr size_t kTransferBytes = 4096;
 uint8_t* transferBuffer;
+std::atomic<uint32_t> droppedLogs{0};
+uint32_t worstPresentationGap = 0;
+bool captureInterrupted = false;
+
+void logMessage(const char* format, ...) {
+  char message[384];
+  va_list arguments;
+  va_start(arguments, format);
+  const int length = vsnprintf(message, sizeof(message), format, arguments);
+  va_end(arguments);
+  if (length < 0 || static_cast<size_t>(length) >= sizeof(message) || !Serial
+      || Serial.availableForWrite() < length) {
+    ++droppedLogs;
+    return;
+  }
+  if (Serial.write(reinterpret_cast<const uint8_t*>(message), length) != static_cast<size_t>(length)) ++droppedLogs;
+}
 
 struct Frame {
   uint16_t* pixels;
-  uint32_t renderUs, decodeUs, compositeUs, eyesUs;
+  uint32_t renderUs, motionUs, decodeUs, compositeUs, eyesUs, effectsUs;
+  CharacterState state;
 };
 Frame frames[2];
 
 [[noreturn]] void fatal(const char* message) {
   for (;;) {
-    Serial.printf("FATAL: %s\n", message);
+    logMessage("FATAL: %s\n", message);
     delay(2000);
   }
 }
@@ -47,97 +75,212 @@ bool inflatePose(uint8_t* output, size_t outputSize, const uint8_t* input, size_
 }
 
 void animate(void*) {
-  Motion motion(esp_random());
-  AnimationClock clock;
-  const int64_t epoch = esp_timer_get_time();
-  int64_t deadline = epoch;
+  CharacterMotion motion(esp_random());
+  if (motion.error()) fatal(motion.error());
+  int64_t previous = esp_timer_get_time();
   for (;;) {
     Frame* frame;
     xQueueReceive(freeFrames, &frame, portMAX_DELAY);
-    const int64_t now = esp_timer_get_time();
-    if (deadline > now) {
-      const uint32_t waitMs = (deadline - now) / 1000;
-      if (waitMs) vTaskDelay(pdMS_TO_TICKS(waitMs));
-    }
     const int64_t start = esp_timer_get_time();
-    if (!renderer->render(motion.sample(clock.advance(start)), frame->pixels)) {
+    CharacterMode command;
+    while (xQueueReceive(commands, &command, 0) == pdTRUE) {
+      if (command == CharacterMode::Surprise) motion.surprise();
+      else if (!motion.setMode(command)) fatal(motion.error());
+      if (motion.error()) fatal(motion.error());
+    }
+    motion.update((start - previous) / 1000000.0);
+    frame->motionUs = esp_timer_get_time() - start;
+    previous = start;
+    frame->state = motion.state();
+    const int64_t restoreStart = esp_timer_get_time();
+    if (!effects->restore(frame->pixels)) fatal(effects->error());
+    const uint32_t restoreUs = esp_timer_get_time() - restoreStart;
+    if (!renderer->render(frame->state.pose, frame->pixels + kCharacterArtOffset)) {
       fatal(renderer->error());
     }
+    const int64_t effectStart = esp_timer_get_time();
+    if (!effects->render(frame->state, frame->pixels)) fatal(effects->error());
+    frame->effectsUs = restoreUs + esp_timer_get_time() - effectStart;
     frame->renderUs = esp_timer_get_time() - start;
     frame->decodeUs = renderer->decodeUs;
     frame->compositeUs = renderer->compositeUs;
     frame->eyesUs = renderer->eyesUs;
     xQueueSend(readyFrames, &frame, portMAX_DELAY);
-    deadline += 1000000 / kTargetFps;
-    if (deadline < esp_timer_get_time()) deadline = esp_timer_get_time();
-    vTaskDelay(1);
   }
 }
 
-bool captureFrame(const Frame& frame) {
-  constexpr size_t bytes = kFrameWidth * kFrameHeight * 2;
-  Serial.printf("FRAME_BE %d %d %u\n", kFrameWidth, kFrameHeight, static_cast<unsigned>(bytes));
-  const auto* data = reinterpret_cast<const uint8_t*>(frame.pixels);
+void waitUntil(int64_t deadline) {
+  int64_t remaining = deadline - esp_timer_get_time();
+  if (remaining <= 0) return;
+  const TickType_t ticks = pdMS_TO_TICKS(remaining / 1000);
+  if (ticks > 1) vTaskDelay(ticks - 1);
+  remaining = deadline - esp_timer_get_time();
+  if (remaining > 0) delayMicroseconds(static_cast<uint32_t>(remaining));
+}
+
+bool writeCapture(const uint8_t* data, size_t bytes) {
   size_t sent = 0;
   int64_t progress = esp_timer_get_time();
   while (sent < bytes) {
-    const size_t count = Serial.write(data + sent, std::min<size_t>(4096, bytes - sent));
+    const int available = Serial.availableForWrite();
+    const size_t count = available > 0
+        ? Serial.write(data + sent, std::min<size_t>(available, bytes - sent)) : 0;
     sent += count;
     if (count) progress = esp_timer_get_time();
     else if (esp_timer_get_time() - progress > 5000000) {
-      Serial.println("\nCAPTURE_ERROR USB write timed out");
+      logMessage("\nCAPTURE_ERROR USB write timed out\n");
       return false;
     }
     if (!count) delay(1);
   }
-  Serial.println("\nEND_FRAME");
   return true;
+}
+
+bool captureFrame(const Frame& frame) {
+  captureInterrupted = true;
+  constexpr size_t bytes = kFrameWidth * kCharacterFrameHeight * 2;
+  char header[256];
+  const int length = snprintf(header, sizeof(header),
+      "CAPTURE_POSE direction=%u frame=%u blink=%u\n"
+      "CAPTURE_STATE mode=%u requested=%u seconds=%.9g event=%u\n"
+      "FRAME_BE %d %d %u\n",
+      static_cast<unsigned>(frame.state.pose.direction), static_cast<unsigned>(frame.state.pose.index),
+      static_cast<unsigned>(frame.state.pose.blinkLevel), static_cast<unsigned>(frame.state.mode),
+      static_cast<unsigned>(frame.state.requestedMode), frame.state.effectSeconds, frame.state.eventId,
+      kFrameWidth, kCharacterFrameHeight, static_cast<unsigned>(bytes));
+  if (length < 0 || static_cast<size_t>(length) >= sizeof(header)) {
+    logMessage("CAPTURE_ERROR header formatting failed\n");
+    return false;
+  }
+  const char end[] = "\nEND_FRAME\n";
+  return writeCapture(reinterpret_cast<const uint8_t*>(header), length)
+      && writeCapture(reinterpret_cast<const uint8_t*>(frame.pixels), bytes)
+      && writeCapture(reinterpret_cast<const uint8_t*>(end), sizeof(end) - 1);
+}
+
+const char* modeName(CharacterMode mode) {
+  switch (mode) {
+    case CharacterMode::Idle: return "idle";
+    case CharacterMode::Surprise: return "surprise";
+    case CharacterMode::Working: return "working";
+    case CharacterMode::Complete: return "complete";
+    case CharacterMode::Attention: return "attention";
+  }
+  return "invalid";
+}
+
+void queueMode(DeviceCommand command) {
+  CharacterMode mode;
+  switch (command) {
+    case DeviceCommand::Idle: mode = CharacterMode::Idle; break;
+    case DeviceCommand::Surprise: mode = CharacterMode::Surprise; break;
+    case DeviceCommand::Working: mode = CharacterMode::Working; break;
+    case DeviceCommand::Complete: mode = CharacterMode::Complete; break;
+    case DeviceCommand::Attention: mode = CharacterMode::Attention; break;
+    default: logMessage("COMMAND_ERROR unknown mode\n"); return;
+  }
+  if (xQueueSend(commands, &mode, 0) != pdTRUE) {
+    logMessage("COMMAND_ERROR mode queue full\n");
+    return;
+  }
+  logMessage("COMMAND accepted=%s\n", commandName(command));
+}
+
+void processCommand(DeviceCommand command, const Frame& frame) {
+  switch (command) {
+    case DeviceCommand::None: break;
+    case DeviceCommand::Invalid: logMessage("COMMAND_ERROR invalid or incomplete packet\n"); break;
+    case DeviceCommand::Capture: captureFrame(frame); break;
+    case DeviceCommand::Heap:
+      if (!heap_caps_check_integrity_all(true)) fatal("Heap integrity check failed.");
+      logMessage("HEAP integrity=ok\n");
+      break;
+    case DeviceCommand::Info:
+      logMessage("INFO protocol=%u uptime_ms=%llu reset_reason=%u mode=%s requested=%s assets=%u "
+                 "max_gap_us=%u dropped_logs=%u\n",
+                    kDeviceProtocol, static_cast<unsigned long long>(esp_timer_get_time() / 1000),
+                    static_cast<unsigned>(esp_reset_reason()), modeName(frame.state.mode),
+                    modeName(frame.state.requestedMode), kSpriteDataSize, worstPresentationGap,
+                    droppedLogs.load(std::memory_order_relaxed));
+      break;
+    default: queueMode(command); break;
+  }
 }
 }
 
 void setup() {
+  static_assert(kSpriteDirections == 13, "Export eight idle tracks and five expression tracks, including alternate attention.");
+  const bool serialBufferReady = Serial.setTxBufferSize(2048) == 2048;
+  Serial.setTxTimeoutMs(0);
   Serial.begin(115200);
+  if (!serialBufferReady) fatal("USB transmit buffer allocation failed.");
+  Serial.setDebugOutput(true);
   if (!psramFound()) fatal("8 MB OPI PSRAM not detected.");
-  Serial.printf("\nCopilot deep turns / Waveshare AMOLED 1.75-B\nPSRAM: %u bytes\n", ESP.getPsramSize());
+  logMessage("\nCopilot generated sprites / Waveshare AMOLED 1.75-B\nPSRAM: %u bytes\n", ESP.getPsramSize());
   if (!display.begin(kSpiFrequency)) fatal("CO5300 initialization failed.");
   display.setBrightness(0);
   display.fillScreen(0);
+  if (!initializeSpriteStorage()) fatal(spriteStorageError());
+  if (!initializeTouchInput()) fatal(touchInputError());
   transferBuffer = static_cast<uint8_t*>(heap_caps_aligned_alloc(
       16, kTransferBytes, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
   if (!transferBuffer) fatal("DMA staging allocation failed.");
-  auto* first = static_cast<uint8_t*>(allocate(kAtlasWidth * kAtlasHeight, MALLOC_CAP_INTERNAL,
-      "First decoded-pose SRAM allocation failed."));
-  auto* second = static_cast<uint8_t*>(allocate(kAtlasWidth * kAtlasHeight, MALLOC_CAP_INTERNAL,
-      "Second decoded-pose SRAM allocation failed."));
-  void* memory = allocate(sizeof(AtlasRenderer), MALLOC_CAP_INTERNAL, "Renderer allocation failed.");
-  renderer = new (memory) AtlasRenderer(first, second, inflatePose);
+  constexpr size_t patchBytes = std::max<size_t>(1, kSpriteMaxPatchPixels) * sizeof(uint16_t);
+  auto* firstOpenPatch = static_cast<uint16_t*>(allocate(patchBytes, MALLOC_CAP_INTERNAL,
+      "First open-eye cache SRAM allocation failed."));
+  auto* secondOpenPatch = static_cast<uint16_t*>(allocate(patchBytes, MALLOC_CAP_INTERNAL,
+      "Second open-eye cache SRAM allocation failed."));
+  auto* patch = static_cast<uint16_t*>(allocate(patchBytes, MALLOC_CAP_INTERNAL,
+      "Blink patch SRAM allocation failed."));
+  void* memory = allocate(sizeof(SpriteRenderer), MALLOC_CAP_INTERNAL, "Renderer allocation failed.");
   freeFrames = xQueueCreate(2, sizeof(Frame*));
   readyFrames = xQueueCreate(2, sizeof(Frame*));
-  if (!freeFrames || !readyFrames) fatal("Frame queue allocation failed.");
+  commands = xQueueCreate(8, sizeof(CharacterMode));
+  if (!freeFrames || !readyFrames || !commands) fatal("Frame or command queue allocation failed.");
   for (auto& frame : frames) {
-    frame.pixels = static_cast<uint16_t*>(allocate(kFrameWidth * kFrameHeight * 2,
+    frame.pixels = static_cast<uint16_t*>(allocate(kFrameWidth * kCharacterFrameHeight * 2,
         MALLOC_CAP_SPIRAM, "Framebuffer PSRAM allocation failed."));
-    std::memset(frame.pixels, 0, kFrameWidth * kFrameHeight * 2);
+    std::memset(frame.pixels, 0, kFrameWidth * kCharacterFrameHeight * 2);
     Frame* pointer = &frame;
     xQueueSend(freeFrames, &pointer, portMAX_DELAY);
   }
+  renderer = new (memory) SpriteRenderer(firstOpenPatch, secondOpenPatch, patch,
+                                        frames[0].pixels + kCharacterArtOffset,
+                                        frames[1].pixels + kCharacterArtOffset, inflatePose);
+  void* effectMemory = allocate(sizeof(CharacterEffects), MALLOC_CAP_INTERNAL, "Effects allocation failed.");
+  effects = new (effectMemory) CharacterEffects(frames[0].pixels, frames[1].pixels);
   if (xTaskCreatePinnedToCore(animate, "copilot-render", 16384, nullptr, 1,
-                              nullptr, 0) != pdPASS) fatal("Render task creation failed.");
-  Serial.printf("READY: %dx%d, target %d fps, atlas=%u bytes, %d source-derived poses\n",
-                kDisplaySize, kDisplaySize, kTargetFps, kAtlasDataSize, kAtlasFrameCount);
+                              &renderTask, 0) != pdPASS) fatal("Render task creation failed.");
+  logMessage("READY: %dx%d, target %d fps, sprites=%u bytes, %d poses, %d tracks\n",
+                kDisplaySize, kDisplaySize, kTargetFps, kSpriteDataSize, kSpriteFrameCount, kSpriteDirections);
 }
 
 void loop() {
   static uint64_t lastReport = esp_timer_get_time();
   static uint64_t renderTotal = 0, transferTotal = 0;
   static uint32_t frameCount = 0, maxRender = 0, fadeFrame = 0;
+  static int64_t nextPresentation = 0, previousPresentation = 0;
+  static uint32_t minGap = UINT32_MAX, maxGap = 0;
+  static DeviceCommands commandParser;
+  static uint32_t previousEvent = UINT32_MAX;
+  static CharacterMode previousMode = CharacterMode::Idle;
   Frame* frame;
   if (xQueueReceive(readyFrames, &frame, pdMS_TO_TICKS(3000)) != pdTRUE) fatal("Renderer stalled.");
+  // Pace presentation, not decoding: cached frames must not arrive earlier than newly decoded poses.
+  waitUntil(nextPresentation);
   const int64_t start = esp_timer_get_time();
+  nextPresentation = start + 1000000 / kTargetFps;
+  if (previousPresentation) {
+    const uint32_t gap = start - previousPresentation;
+    minGap = std::min(minGap, gap);
+    maxGap = std::max(maxGap, gap);
+    worstPresentationGap = std::max(worstPresentationGap, gap);
+  }
+  previousPresentation = start;
   display.startWrite();
-  display.writeAddrWindow(kFrameX, kFrameY, kFrameWidth, kFrameHeight);
+  display.writeAddrWindow(kFrameX, 0, kFrameWidth, kCharacterFrameHeight);
   const auto* bytes = reinterpret_cast<const uint8_t*>(frame->pixels);
-  constexpr size_t frameBytes = kFrameWidth * kFrameHeight * 2;
+  constexpr size_t frameBytes = kFrameWidth * kCharacterFrameHeight * 2;
   for (size_t offset = 0; offset < frameBytes; offset += kTransferBytes) {
     const size_t count = std::min(kTransferBytes, frameBytes - offset);
     std::memcpy(transferBuffer, bytes + offset, count);
@@ -149,7 +292,30 @@ void loop() {
     display.setBrightness(static_cast<uint8_t>(kBrightness * smoother(fadeFrame / 40.0f)));
     ++fadeFrame;
   }
-  if (Serial.available() && Serial.read() == 's') captureFrame(*frame);
+  TouchTap tap;
+  if (pollTouchTap(tap)) {
+    const int x = tap.x - kFrameX, y = tap.y;
+    if (x >= 0 && y >= 0 && x < kFrameWidth && y < kCharacterFrameHeight
+        && frame->pixels[y * kFrameWidth + x] != 0) {
+      logMessage("TOUCH x=%d y=%d\n", tap.x, tap.y);
+      queueMode(DeviceCommand::Surprise);
+    }
+  }
+  if (touchInputError()) fatal(touchInputError());
+  processCommand(commandParser.expire(esp_timer_get_time() / 1000), *frame);
+  for (unsigned read = 0; read < 8 && Serial.available(); ++read) {
+    processCommand(commandParser.feed(static_cast<char>(Serial.read()), esp_timer_get_time() / 1000), *frame);
+  }
+  if (frame->state.eventId != previousEvent || frame->state.mode != previousMode) {
+    logMessage("STATE mode=%s requested=%s event=%u\n", modeName(frame->state.mode),
+                  modeName(frame->state.requestedMode), frame->state.eventId);
+    previousEvent = frame->state.eventId;
+    previousMode = frame->state.mode;
+  }
+  if (captureInterrupted) {
+    previousPresentation = nextPresentation = 0;
+    captureInterrupted = false;
+  }
   renderTotal += frame->renderUs;
   transferTotal += transferUs;
   maxRender = std::max(maxRender, frame->renderUs);
@@ -159,14 +325,29 @@ void loop() {
   const uint64_t now = esp_timer_get_time();
   if (now - lastReport >= 5000000) {
     if (Serial) {
-      Serial.printf("PERF fps=%.1f render=%.2fms transfer=%.2fms max_render=%.2fms free_psram=%u\n",
+      logMessage("PERF fps=%.1f render=%.2fms transfer=%.2fms max_render=%.2fms free_psram=%u dropped_logs=%u\n",
                     frameCount * 1000000.0 / (now - lastReport),
                     renderTotal / (1000.0 * frameCount), transferTotal / (1000.0 * frameCount),
-                    maxRender / 1000.0, ESP.getFreePsram());
-      Serial.printf("STAGES decode=%uus composite=%uus eyes=%uus\n",
-                    timing.decodeUs, timing.compositeUs, timing.eyesUs);
+                    maxRender / 1000.0, ESP.getFreePsram(), droppedLogs.load(std::memory_order_relaxed));
+      logMessage("STAGES motion=%uus decode=%uus composite=%uus eyes=%uus effects=%uus\n",
+                    timing.motionUs, timing.decodeUs, timing.compositeUs, timing.eyesUs, timing.effectsUs);
+      logMessage("PACING min_gap_us=%u max_gap_us=%u\n",
+                    minGap == UINT32_MAX ? 0 : minGap, maxGap);
+      constexpr uint32_t internalCaps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+      // ESP-IDF reports stack high-water marks in bytes, unlike vanilla FreeRTOS.
+      logMessage("MEM free_internal=%u min_internal=%u largest_internal=%u free_psram=%u "
+                    "render_stack_free=%u display_stack_free=%u\n",
+                    static_cast<unsigned>(heap_caps_get_free_size(internalCaps)),
+                    static_cast<unsigned>(heap_caps_get_minimum_free_size(internalCaps)),
+                    static_cast<unsigned>(heap_caps_get_largest_free_block(internalCaps)), ESP.getFreePsram(),
+                    static_cast<unsigned>(uxTaskGetStackHighWaterMark(renderTask)),
+                    static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)));
+      logMessage("POSE direction=%u frame=%u blink=%u\n", static_cast<unsigned>(timing.state.pose.direction),
+                    static_cast<unsigned>(timing.state.pose.index), static_cast<unsigned>(timing.state.pose.blinkLevel));
     }
     frameCount = maxRender = 0;
+    minGap = UINT32_MAX;
+    maxGap = 0;
     renderTotal = transferTotal = 0;
     lastReport = now;
   }

@@ -1,14 +1,12 @@
 # Copilot / AMOLED
 
-**Current visual experiment:** GPT Image-generated sprite frames, reviewed locally
-at **http://127.0.0.1:8765/sprite-preview.html**. The earlier image-morphing approach
-below is retained for comparison, but was rejected for unnatural deformation.
-Do not treat it as an approved final animation or flash it while visual review
-is ongoing.
+**Current implementation:** GPT Image-generated sprites, with an ESP32 playback
+engine and a native character review at **http://127.0.0.1:8765/character-preview.html**.
+The earlier image-morphing atlas is retained only as a superseded comparison.
 
 A quietly expressive desktop companion for the **Waveshare
 ESP32-S3-Touch-AMOLED-1.75-B**: the supplied blue/violet Copilot artwork, deep
-directional head turns, eye-leading glances, relaxed pauses,
+directional head turns, relaxed pauses,
 and occasional asymmetric-timed blinks and double blinks. No scrolling text,
 UI chrome, Wi-Fi, cloud service, speaker, or microSD card is required.
 
@@ -25,9 +23,11 @@ but the application and partition table change. Do not assume existing factory
 application data remains compatible. This project never accesses the microSD or
 writes to the battery charger configuration.
 
-The deep-turn version uses the sketch's custom **11 MiB application partition**
-to hold the source-derived pose atlas. It has no OTA slot and does not mount
-the remaining storage partition. This differs from the initial 3 MiB demo layout.
+The current source uses a custom **2 MiB application partition** and a separate
+**13.875 MiB read-only sprite partition**. The uploader writes the matched
+application, partition table, and sprite payload together. Firmware verifies the
+sprite SHA256 before animation starts. There is no OTA slot or mounted filesystem.
+This replaces the earlier 11 MiB application layout that embedded all artwork.
 
 The scripts use the existing Arduino IDE CLI, its configuration, and Waveshare's
 bundled GFX library. Overrides: `ARDUINO_CLI`, `ARDUINO_CONFIG`, `WAVESHARE_DIR`.
@@ -39,7 +39,8 @@ CO5300 panel driver and QSPI path this board needs.
 - Arduino ESP32 core **3.3.10**
 - Waveshare repository `https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-1.75`
 - Vendor revision used: `e4344e70c2fa78a13e8a06566507f1ba8af6672a`
-- Library: `examples/arduino/libraries/GFX_Library_for_Arduino`, version 1.6.4
+- Libraries: `examples/arduino/libraries/GFX_Library_for_Arduino`, version 1.6.4,
+  and `examples/arduino/libraries/SensorLib`, version 0.3.1 (CST9217 touch)
 
 On another machine, install Arduino CLI, configure the Espressif board URL,
 install the pinned core, and clone the vendor repository:
@@ -70,21 +71,118 @@ to your sketchbook, then select:
 | CPU | 240 MHz |
 | Flash | QIO 80 MHz, 16 MB |
 | PSRAM | OPI PSRAM |
-| Partition | Custom: sketch `partitions.csv` (11 MiB application) |
+| Partition | Custom: sketch `partitions.csv` (2 MiB application plus sprite data) |
 | USB mode | Hardware CDC and JTAG |
 | USB CDC on boot | Enabled |
 | Arduino core / event core | 1 / 1 |
+| Core debug level | Error |
 | Erase all flash | Disabled |
 
 Hardware: 466 x 466 CO5300 AMOLED; QSPI CS=12, CLK=38, D0..D3=4..7,
 RESET=39; vendor column offset=6. The `-B` variant is the standard board
 with a protective case. USB data uses GPIO19/20 and is not repurposed.
 
-Before the first IDE build, run `python3 tools/embed_atlas.py`. The CLI build
-does this automatically. The CLI workflow also supplies the 11 MiB size limit;
-it is the recommended build/upload path for the custom partition layout.
+Before the first IDE build, run `python3 tools/embed_sprites.py`. The CLI build
+does this automatically. Use the CLI workflow to upload: it derives offsets and
+size limits from the partition CSV and includes the separately flashed sprite
+payload. An ordinary IDE sketch upload alone does not install that payload.
+Build/upload guards reject changed inputs or mismatched binaries rather than
+flashing an incompatible set.
+After a complete upload, `bash tools/arduino.sh upload-code PORT` can update only
+firmware when the sprites and partition layout are unchanged. Boot-time SHA256
+validation still rejects mismatched assets; use a complete `upload` after changing
+artwork or flash layout.
 
 ## Preview and development
+
+### Character Lab
+
+Run `python3 tools/serve_preview.py`, then open **http://127.0.0.1:8765**.
+The browser displays frames rendered by the same C++ motion, sprite, and effects
+code as the device. Each tab has its own isolated native process. The original
+eight-direction study remains at `/sprite-preview.html`.
+
+**Current deployed version:** a faster widening-eye surprise and side-to-side
+double-take, larger binary digits flowing through the top edge during Working,
+slow working glances, and alternating attention tilts. The three bottom activity
+dots are removed. The native web preview uses the same reviewed implementation.
+
+| Signal | Visual behavior | Duration |
+| --- | --- | --- |
+| Surprise | Smooth widening eyes and recoil, followed by a quick left/right double-take and softer settle | One reaction, then resumes the previous persistent mode |
+| Working | Normal-to-focused eyes, slow randomized side glances, tiny bidirectional binary streams and cyan orbit | Until another signal arrives |
+| Complete | Happy crescent eyes, rising fireworks and falling confetti | One celebration, then idle |
+| Needs attention | Alternating large/small eyes and slow questioning head tilts, with a breathing amber question badge | Until explicitly changed; a surprise does not dismiss it |
+
+Click/tap the character, or focus it and press Enter/Space, to trigger surprise.
+Keys 1-5 select the five modes including idle. Pause freezes both expression and
+effects; the speed selector includes half and quarter speed for inspection.
+All four mode links are also prominently available on `/sprite-preview.html`.
+Transitions retrace to the shared center before switching tracks.
+Working stays visibly active during its slow, partial-depth side glances, then
+returns to its focused expression.
+
+The revised surprise preserves the original endpoint eye sizes and positions relative to the head,
+but replaces the uneven generated in-between frames with deterministic,
+subpixel eye-light animation over the unchanged approved head. A single rigid
+transform adds a two-degree tilt and four-source-pixel lift (about seven display
+pixels), synchronized with the widening eyes. The eased return retraces the same
+frames; there is no head warping, scaling, or crossfading. It also finishes
+an existing blink before entering the reaction, avoiding a closed-to-wide-open
+jump. Original generated surprise frames remain archived and unchanged.
+Run `python3 tools/smooth_surprise.py` to rebuild only this active track.
+Surprise/joy retain their defining expressions rather than interrupting them
+with an unrelated eye closure.
+
+The touch reaction adds a two-sided search after the initial widened-eye recoil.
+The initial widening uses a shorter easing duration (0.5 rather than 0.75 seconds),
+while still displaying every intermediate pose. At 30 Hz, the one-pose-per-update
+limit stretches the effective duration; the hold, double-take, and return are unchanged.
+It retraces the expression to center, uses the existing approved left/right
+sprites for brisk partial-depth looks, and eases back before resuming the previous
+state. The first side is randomized; the second is always the opposite.
+No new sprite images, head deformation, crossfading, or extra flash storage are
+needed. An explicit new mode interrupts by retracing the current pose to center.
+
+Working adds eight miniature 4x7 cyan binary digits in four
+lanes between the head and the physical top edge: two flowing inward and two
+outward. Digit identities stay stable in transit, with smooth fades near the
+head and offscreen recycling above the display. The four-second cycle wraps
+seamlessly with the effect clock. The effect
+continues through focused poses and side glances, preserves the existing orbit,
+and uses the same fixed damage buffer without additional allocations. The three
+bottom activity dots have been removed to reduce clutter.
+
+Character output now spans 400 x 466 pixels at panel position (33, 0), while the
+unchanged 400 x 352 sprite is decoded directly into its original centered
+location inside each buffer. No additional image copies or flash assets are
+required, and the legacy atlas preview retains its original dimensions.
+The two full-height PSRAM buffers add 182,400 bytes total. Display transfers
+grow by about 32%; the full-height version requires its own on-device timing
+measurements rather than relying on the earlier smaller-frame results.
+
+Needs attention holds each curious side for 2.2-4.2 seconds, then eases through
+center to the opposite tilt. The original attention track remains untouched.
+An additional 24-pose track swaps only its eye-light layers and counter-rotates
+the complete head, preserving the original shell, lighting, and eye shapes.
+The question badge and waiting state remain active throughout; repeated attention
+signals do not restart the cycle. Run `python3 tools/alternate_attention.py` to
+rebuild the alternate track. No new AI generation is used for either refinement.
+
+Effects write only to black background pixels, with additional face protection.
+Each framebuffer records its small effect footprint so it can be cleared without
+copying the entire image. The fixed effects workspace is 32,816 bytes.
+The art was reviewed in this web app before device deployment; generated shading
+still has minor frame-to-frame variation rather than mathematically rigid 3D geometry.
+
+```bash
+bash tools/test_character.sh
+bash tools/test_working_bits.sh
+bash tools/test_device_inputs.sh
+python3 -m unittest discover -s tests -p test_smooth_surprise.py
+python3 -m unittest discover -s tests -p test_alternate_attention.py
+NODE_PATH="$(npm root -g)" node tests/character-preview.browser.cjs
+```
 
 ### GPT Image sprite-sheet experiment
 
@@ -216,9 +314,9 @@ attempt is retained as `left-turn-rejected-wrong-direction.png`: it turned right
 despite its instructions and was not selected. Prompt angle labels describe
 requested angles, not measured physical rotations.
 
-These expanded sprites are **browser-review assets only**. The device still
-runs the previous firmware; the browser PNG asset directory is not
-an ESP32-ready flash package and needs a separate compact export.
+The browser PNG directory is not copied directly to flash. The firmware exporter
+converts the selected manifest into compressed RGB565 poses and small blink
+patches; see the firmware section below.
 
 GPT Image does not guarantee temporal identity or precise angular increments.
 This is a quality experiment, not a claim that generative images alone solve
@@ -230,8 +328,8 @@ smooth character animation. Judge the actual neighboring frames in the preview.
 python3 tools/serve_preview.py
 ```
 
-Open **http://127.0.0.1:8765** for the current generated-sprite review.
-The superseded experiment remains at `/morph-studio.html`. That Motion Studio runs the actual C++ firmware
+Open **http://127.0.0.1:8765** for Character Lab, or `/sprite-preview.html` for the detailed generated-sprite study.
+The superseded experiment remains at `/morph-studio.html`. That Motion Studio runs the previous C++ atlas-based
 motion engine and renderer in a persistent native process; the browser displays
 its RGB565 frames. It is not an approximation of the animation in JavaScript.
 
@@ -249,10 +347,10 @@ standard zlib library, but no Python packages. `--port` selects another port.
 Stop it with Ctrl+C. Browser preview validates motion and image transitions,
 not physical AMOLED scanout or ESP32 frame throughput.
 
-### Offline preview and asset regeneration
+### Legacy offline preview and atlas regeneration
 
 Open `preview/index.html` directly in a browser. The animated WebP is an
-18-second **deterministic sample of the actual C++ renderer**, not a separate
+18-second **deterministic sample of the previous C++ atlas renderer**, not a separate
 JavaScript approximation. It is offline, honors reduced-motion preferences,
 and includes a pause button. Device randomness is seeded from `esp_random()`,
 so the device will not repeat the preview sequence.
@@ -274,7 +372,100 @@ and temporarily writes approximately 152 MB of raw frames inside `build/`.
 The compressed pose atlas and its metadata are included; ordinary builds do not need
 asset-generation dependencies.
 
-## Animation and rendering
+## Generated-sprite firmware
+
+Regenerate the display-ready firmware assets after changing any selected sprite or
+the browser manifest:
+
+```bash
+python3 tools/export_sprite_firmware.py
+python3 tools/embed_sprites.py
+bash tools/run_sprite_motion_tests.sh
+bash tools/test_sprite_renderer.sh
+python3 -m unittest discover -s tests -p 'test_sprite_firmware_assets.py'
+bash tools/arduino.sh build
+bash tools/arduino.sh upload /dev/cu.usbmodem2101
+```
+
+Export requires the existing art dependencies; embedding and ordinary builds use
+the exported binary and generated metadata. Stale source assets are rejected
+rather than silently uploading an older sprite set.
+The exporter checks the packed payload against its flash budget. Poses are
+pre-scaled offline to the 400 x 352 display region, trading more flash storage
+for substantially smaller SRAM workspaces and no runtime image scaling.
+The current thirteen-track payload is **13,836,789 bytes**, leaving 712,203 bytes in
+the sprite partition. The largest decoded eye patch remains 14,904 bytes.
+This package is deployed with the approved surprise double-take, alternating
+attention, working glances, and full-height binary streams.
+
+- Thirteen tracks contain 24 poses each: eight idle directions and five
+  expression tracks, including the alternate attention tilt. All poses remain stored, but
+  straight up/down animation is limited to frame 12 of 24. Sideways and diagonal
+  tracks retain their full ranges.
+- Open poses use zlib-compressed, big-endian RGB565 without an intermediate
+  palette. Four blink levels are rectangular patches over each open pose,
+  not four additional full images. Identical blocks are deduplicated.
+- `SpriteMotion` ports the preview's discrete timing: random directions avoid
+  immediate repetition, target depth and holds vary, returns retrace adjacent
+  poses through center, and shorter looks finish sooner. Fractional timing is
+  retained while stalls cannot advance more than one pose per rendered update.
+  A single-entry edge-duration cache avoids repeated inverse-easing calculations
+  without changing the motion formulas or allocating a lookup table.
+- Blinks advance independently while the head continues moving. The hardware
+  seeds randomness from `esp_random()` at startup. No network is involved.
+- The exporter preserves the spatial bilinear filtering used by the earlier
+  device renderer. `SpriteRenderer` decodes straight into the destination
+  framebuffer and applies the selected eye patch in display byte order. It never
+  blends different poses or uses the browser's optional crossfade.
+- Per-framebuffer render keys avoid decoding or copying unchanged poses. Each
+  output keeps only a small original-eye patch for reopening; there are no
+  full-size decoded or working sprites in SRAM and no third PSRAM frame cache.
+  Persistent workspaces avoid allocation in the animation loop. Core 0 renders;
+  core 1 transfers complete big-endian RGB565 buffers to the display through the
+  existing DMA staging path. Presentation is paced independently of rendering,
+  so cached frames cannot arrive early and newly decoded poses late. The target
+  remains 30 displayed frames per second.
+
+The optimized eight-track idle baseline completed a five-minute device soak:
+all 59 reports were **30.0 fps**, the maximum presentation interval was
+**33.345 ms**, and maximum rendering time was **31.44 ms**. Internal free heap
+stayed at 256,672 bytes, its largest block at 212,980 bytes, and free PSRAM at
+7,812,340 bytes. Minimum remaining render/display stack was 15,072/5,900 bytes;
+the on-device heap integrity check passed. These are baseline measurements,
+not a substitute for rechecking new emotional modes and effects.
+Repeated USB diagnostics also showed two stable capture cycles, but a later
+capture lost its USB connection; that transport interruption is not evidence
+of a memory leak or proof that every diagnostic path is stable.
+
+Host renderer tests reconstruct all 1,560 pose/eye states, check exact source
+RGB565 pixels, shared centers, both independent output caches, complete reopening,
+buffer guards and recovery after a partially failed decode
+under address/undefined-behavior sanitizers. Motion tests also compare deterministic
+C++ and JavaScript traces and verify allocation-free updates. Actual display throughput and
+panel appearance must also be checked after uploading. The driver does not
+synchronize to panel TE, so software buffering is not a guarantee of tear-free
+physical scanout.
+
+The deployed full-height version completed its own five-minute mixed-mode run:
+all 60 reports were **30.0 fps**, and the maximum measured normal presentation
+interval was **33.348 ms** (33.349 ms over the device lifetime at the final check).
+All five modes, both attention tilts, and both working-glance directions were
+observed. All 60 memory reports held **218,272 bytes** free internal heap,
+**172,020 bytes** as the largest internal block, and **7,630,608 bytes** free
+PSRAM. Minimum remaining render/display stack was **14,956/5,612 bytes**;
+heap integrity passed. The device was returned to automatic idle afterward.
+
+The earlier thirteen-track deployment with 352-pixel-high output completed a five-minute mixed-mode run:
+all 60 reports were **30.0 fps**, maximum normal presentation interval was
+**33.346 ms**, and internal free heap stayed at **218,272 bytes** with
+**7,810,832 bytes** free PSRAM. Heap integrity passed. Both attention tilts,
+both working-glance directions, and three additional physical touches were
+observed during the measured window. The soak harness now accounts for physical
+touches alongside its twelve scripted signals rather than treating them as
+unexpected commands. These measurements precede the double-take and full-height
+binary-stream implementation.
+
+## Legacy atlas experiment (not current firmware)
 
 - Uses the frontal, three-quarter, profile, upward and downward views from
   the supplied sheet. Left-facing views are mirrored. Pale backgrounds are
@@ -316,29 +507,44 @@ asset-generation dependencies.
 `firmware/Copilot/build_opt.h` enables `-O3` and the vendor QSPI chunk size for
 both CLI and Arduino IDE builds. Do not remove it when copying the sketch.
 
-Tune `firmware/Copilot/src/Config.h`: brightness (0..255), target frame rate,
-move and hold ranges, blink timing, and SPI clock. Turn depth comes from the
+For current firmware, tune display brightness (0..255), target frame rate and SPI
+clock in `Config.h`, and sprite motion in `SpriteMotion.cpp`. The following
+atlas-specific settings apply only to the old experiment. Turn depth comes from the
 atlas endpoints and `Motion.cpp`'s target magnitude, not a 2D warp angle.
 The pose landmarks and eye locations are calibrated to this supplied artwork.
-This is an animation-only app; touch and IMU are not initialized.
+The current source initializes CST9217 touch for character taps. The IMU remains
+unused. Touch uses SDA15/SCL14, interrupt11, reset40, and the vendor's mirrored
+XY orientation, with pixel bounds 0..465.
 
 ## Diagnostics and recovery
 
-```bash
-bash tools/arduino.sh monitor /dev/cu.usbmodem2101
-```
+Use the non-resetting observer below rather than an ordinary serial monitor.
 
 Every five seconds, `PERF` reports displayed fps, rendering and transfer time,
 maximum render time, and free PSRAM. `STAGES` breaks down the last frame's
-decompression, compositing, and eye rendering time.
+motion, decompression, open-eye cache copy, eye rendering, and effects time.
+`PACING` reports minimum/maximum presentation intervals rather than relying on
+average fps alone. `MEM` reports current/minimum internal heap, largest internal
+free block, free PSRAM, and both tasks' minimum remaining stack. All memory and
+stack values are **bytes**, as defined by the pinned ESP-IDF headers.
+USB diagnostics use a preallocated transmit buffer, zero write timeout, and
+whole-message capacity checks. A missing/slow reader drops diagnostic messages
+instead of blocking animation; `dropped_logs` makes that backpressure visible.
+`INFO max_gap_us` retains the worst normal presentation interval since boot.
+Explicit framebuffer captures are excluded from that lifetime interval because
+they intentionally pause animation.
 Allocation, panel startup,
 and renderer-stall errors print `FATAL` rather than silently continuing.
 If a panel is unstable at 80 MHz, lower `kSpiFrequency` to 40000000 and rebuild.
 
-For tooling, sending the single serial byte `s` captures a completed framebuffer:
-ASCII `FRAME_BE 400 352 281600\n`, followed by exactly 281600 big-endian RGB565
-bytes, then `\nEND_FRAME`. Place the captured region at (33, 57) on a black
-466 x 466 canvas. Diagnostic capture temporarily interrupts animation while
+For tooling, sending the single serial byte `s` captures a completed framebuffer.
+`CAPTURE_POSE` identifies its direction, zero-based sprite index and blink level.
+The image protocol then sends:
+ASCII `FRAME_BE 400 466 372800\n`, followed by exactly 372800 big-endian RGB565
+bytes, then `\nEND_FRAME`. Place the captured region at (33, 0) on a black
+466 x 466 canvas. The observer also accepts the older
+`FRAME_BE 400 352 281600\n` format and centers that region at (33, 57).
+Diagnostic capture temporarily interrupts animation while
 USB transfers the frame; do not request it continuously.
 
 A bounded health check and PNG capture are also included:
@@ -346,6 +552,9 @@ A bounded health check and PNG capture are also included:
 ```bash
 .venv/bin/pip install -r requirements-device.txt -r requirements-art.txt
 .venv/bin/python tools/device.py --seconds 60 --capture preview/device-capture.png
+# A five-minute memory/pacing soak; initial warmup is logged separately.
+.venv/bin/python tools/device.py --warmup-seconds 30 --seconds 300 \
+  --check-memory --max-gap-ms 35 --log build/device-soak.log
 ```
 
 The command fails on runtime errors, missing telemetry, or five-second
@@ -355,6 +564,36 @@ On macOS/Linux this observer leaves DTR/RTS untouched and disables hang-up
 line dropping, so opening/closing it does not intentionally reset the ESP32.
 Ordinary serial tools that toggle those lines can reboot the board and make
 the character suddenly reappear at center.
+
+`--check-memory` requires at least three memory reports, checks exact heap
+stability by default, requires internal-heap/stack headroom, and requests an
+on-device heap integrity check (`h`) after the measured interval. A bounded soak
+can find leaks or fragmentation but is not proof that every possible execution
+is leak-free. `--memory-tolerance` explicitly permits a measured variation; the
+default is zero. Warmup records remain visible and are marked in the log.
+
+### Character event protocol
+
+New character firmware accepts `!idle\n`, `!surprise\n`, `!working\n`,
+`!complete\n`, and `!attention\n`. Packets are bounded and time out after one
+second of inactivity. `COMMAND accepted=...` acknowledges queueing;
+`STATE mode=... requested=... event=...` distinguishes the visible mode from a
+pending transition. The single byte `i` reports protocol version, uptime,
+reset reason, current/requested mode, and sprite size.
+
+The observer negotiates protocol support before sending a mode packet, so it
+does not accidentally trigger legacy capture commands on older firmware:
+
+```bash
+.venv/bin/python tools/device.py --mode working --seconds 15
+.venv/bin/python tools/device.py --mode attention --seconds 15
+.venv/bin/python tools/device.py --mode complete --seconds 15
+.venv/bin/python tools/device.py --mode surprise --seconds 15
+```
+
+These are explicit local triggers for a later Copilot CLI connection, not an
+automatic CLI integration. New behaviors must be reviewed in the web preview
+before uploading them to the device.
 
 If the board is not detected, use `arduino-cli board list` to find its new port.
 Close any serial monitor before uploading. If necessary, hold BOOT while

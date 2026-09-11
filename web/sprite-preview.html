@@ -18,6 +18,10 @@
     button[aria-pressed=true]{border-color:#8a91d5;background:#303750}
     button:disabled,select:disabled{opacity:.45;cursor:not-allowed}
     .queue-status{min-height:36px;overflow-wrap:anywhere}
+    .reaction-links{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px}
+    .reaction-links a{display:block;padding:14px;border:1px solid #47556f;border-radius:10px;background:#202a3b;color:#d3e4f5;text-decoration:none;font-size:13px}
+    .reaction-links small{display:block;margin-top:5px;color:#9cabc2;font-size:11px}
+    @media(max-width:700px){.reaction-links{grid-template-columns:repeat(2,minmax(0,1fr))}}
   </style>
 </head>
 <body>
@@ -25,9 +29,16 @@
     <div class="engine"><span class="status-dot"></span> Azure GPT Image <span class="separator">/</span> Sprite playback</div>
   </header>
   <main>
-    <div class="intro"><div><p class="eyebrow">Reference-guided sprite generation</p><h1>Eight directions to explore.</h1></div>
+    <div class="intro"><div><p class="eyebrow">Reference-guided sprite generation</p><h1>Eight directions to explore.</h1>
+      <a class="sheet-link" href="/character-preview.html">Review native emotional modes →</a></div>
       <p class="intro-note">Eight generated directions. One shared center.<br>New diagonal sprites replace the device atlas.</p>
     </div>
+    <nav class="reaction-links" aria-label="Preview interactive character modes">
+      <a href="/character-preview.html?mode=surprise">Touch / surprise<small>Revised smooth-eye reaction</small></a>
+      <a href="/character-preview.html?mode=working">Working<small>Focused eyes and activity</small></a>
+      <a href="/character-preview.html?mode=complete">Complete<small>Happy eyes and fireworks</small></a>
+      <a href="/character-preview.html?mode=attention">Needs attention<small>Curious eyes and question cue</small></a>
+    </nav>
     <p class="prototype" id="asset-status">Browser-only sprite review. Every pose and eyelid level is a pre-baked image. Compare discrete playback with optional adjacent-frame crossfading; neither mode warps the head. Firmware is unchanged.</p>
     <div id="error" class="error" role="alert" hidden></div>
     <div class="workspace">
