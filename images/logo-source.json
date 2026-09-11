@@ -1,0 +1,40 @@
+{
+  "created": "2026-09-11T23:51:29.357853+00:00",
+  "provider": "Configured Azure GPT Image deployment",
+  "reference": "images/references/logo-original.png",
+  "references": [
+    {
+      "file": "images/references/logo-original.png",
+      "sha256": "1b7e4b94601ff66bfbf336278061489df9c01bd01d61ea687547f0ef926ae887"
+    },
+    {
+      "file": "images/references/device-reference.png",
+      "sha256": "f34df5c5d0df8bff93941b948ac7fd8ebde3e2061ee92432da09643989d98957"
+    }
+  ],
+  "referenceSha256": "1b7e4b94601ff66bfbf336278061489df9c01bd01d61ea687547f0ef926ae887",
+  "prompt": "images/logo.prompt.txt",
+  "promptText": "Edit the first reference logo using the second reference only for the physical shape of the device. Preserve the first logo's premium rounded hexagonal navy/cobalt badge, cyan/violet illuminated outline, and especially its attractive ESP32 chip graphic and short glowing circuit traces. Technical documentation style, polished dimensional vector-like rendering, clean white background, crisp silhouettes.\n\nReplace the thick device with a fairly thin, flat, round black AMOLED display puck matching the second reference: near-front view with only a slim side edge and narrow black rim, like a small round screen module. IMPORTANT: remove the stand completely, including every base, support, arm, foot, bracket and mount. The round device floats as an emblem element with nothing supporting it. No thick cylindrical body, camera housing, watch strap, desk base, or speaker vents.\n\nRemove all glasses and goggles. The screen itself shows a simple friendly digital face: two softly glowing cyan eyes and a subtle small violet smile against deep navy. No eyeglass frames, rims around the eyes, lenses, bridge, spectacles, goggles, or eyebrows shaped like glasses. Do not copy the mushroom image from the hardware reference.\n\nKeep the ESP32 chip at the lower right with the exact label 'ESP32' and the clean cyan traces. Keep the same blue/cyan/violet color palette. Arrange the thin round display above-left of the chip, balanced within the badge, with the stand's former area now clean and uncluttered.\n\nGenerate a 1536x1024 PNG with the complete badge centered inside the middle 900 pixels of width, leaving white space on both sides so a centered near-square crop will not cut anything off. Use proper margins on all sides. Ensure all text is spelled correctly and fully visible. Ensure all content is fully visible. No extra text, arrows, paper planes, watermarks, or additional objects.\n",
+  "promptSha256": "b1ddb9f9d54ddf8544eca6bfa2c8375a5a30b6070cb0817e2e7b5b717ee82d5a",
+  "size": [
+    1536,
+    1024
+  ],
+  "quality": "high",
+  "format": "png",
+  "generationSeconds": 80.45,
+  "sha256": "a2ec05354e1fa517139e9988f07487149d3883c9fdf754ad00d477385d3fc381",
+  "usage": {
+    "input_tokens": 3007,
+    "input_tokens_details": {
+      "image_tokens": 2625,
+      "text_tokens": 382
+    },
+    "output_tokens": 5488,
+    "output_tokens_details": {
+      "image_tokens": 5488,
+      "text_tokens": 0
+    },
+    "total_tokens": 8495
+  }
+}

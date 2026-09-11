@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/logo.png" alt="An expressive ESP32 desktop companion on a glowing blue badge" width="800">
+  <img src="images/logo.png" alt="A thin round ESP32 display with a friendly face and microcontroller graphic" width="400">
 </p>
 
 # ESP32 Copilot
