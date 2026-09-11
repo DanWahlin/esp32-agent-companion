@@ -10,7 +10,7 @@
 
 using namespace copilot;
 namespace {
-constexpr size_t kPixels = kFrameWidth * kCharacterFrameHeight;
+constexpr size_t kPixels = kCharacterFrameWidth * kCharacterFrameHeight;
 std::array<uint16_t, kPixels + 2> first{}, second{};
 bool forbidAllocations = false;
 constexpr uint8_t zero[] = {6, 9, 9, 9, 9, 9, 6};
@@ -42,9 +42,10 @@ void draw(CharacterEffects& effects, CharacterState state, uint16_t* frame) {
 }
 
 void glyph(const uint16_t* frame, int x, int y, const uint8_t* rows) {
+  x += kCharacterArtX;
   for (int row = 0; row < 7; ++row) {
     for (int column = 0; column < 4; ++column) {
-      if (bool(frame[(y + row) * kFrameWidth + x + column])
+      if (bool(frame[(y + row) * kCharacterFrameWidth + x + column])
           != bool(rows[row] & (1 << (3 - column)))) {
         std::cerr << "Glyph mismatch at " << x << ',' << y << " cell " << column << ',' << row << '\n';
         assert(false);
@@ -56,7 +57,7 @@ void glyph(const uint16_t* frame, int x, int y, const uint8_t* rows) {
 uint64_t checksum(const uint16_t* frame) {
   uint64_t result = 14695981039346656037ull;
   for (size_t i = 0; i < kFrameWidth * kFrameHeight; ++i) {
-    result ^= frame[kCharacterArtOffset + i];
+    result ^= frame[(kFrameY + i / kFrameWidth) * kCharacterFrameWidth + kCharacterArtX + i % kFrameWidth];
     result *= 1099511628211ull;
   }
   return result;
@@ -105,7 +106,7 @@ void visibleShapesAndDirection() {
   glyph(second.data() + 1, 222, 25, one);
   auto brightness = [&](float seconds, int y) {
     draw(effects, working(seconds), first.data() + 1);
-    const uint16_t stored = first[1 + y * kFrameWidth + 177];
+    const uint16_t stored = first[1 + y * kCharacterFrameWidth + 177 + kCharacterArtX];
     const uint16_t rgb = static_cast<uint16_t>((stored << 8) | (stored >> 8));
     return (rgb >> 11) + ((rgb >> 5) & 63) + (rgb & 31);
   };
@@ -116,7 +117,7 @@ void visibleShapesAndDirection() {
     draw(effects, working(sample.first), first.data() + 1);
     bool reachesEdge = false;
     for (int x = sample.second; x < sample.second + 4; ++x)
-      reachesEdge |= first[1 + x] != 0;
+      reachesEdge |= first[1 + x + kCharacterArtX] != 0;
     assert(reachesEdge);
   }
 }
@@ -139,7 +140,7 @@ void continuityAndPoseIndependence() {
     draw(effects, working(tick / 30.f), first.data() + 1);
     for (int y = 330 + kFrameY; y <= 335 + kFrameY; ++y)
       for (int x = 177; x <= 223; ++x)
-        assert(first[1 + y * kFrameWidth + x] == 0);
+        assert(first[1 + y * kCharacterFrameWidth + x + kCharacterArtX] == 0);
   }
   // During an interior transit, each digit's top moves by at most one raster row
   // per refresh, without changing the glyph's zero/one identity.
@@ -148,7 +149,7 @@ void continuityAndPoseIndependence() {
     draw(effects, working(tick / 120.f), first.data() + 1);
     int top = -1;
     for (int y = 0; y <= 40; ++y) {
-      if (first[1 + y * kFrameWidth + 177]) { top = y; break; }
+      if (first[1 + y * kCharacterFrameWidth + 177 + kCharacterArtX]) { top = y; break; }
     }
     assert(top >= 0);
     if (priorTop >= 0) assert(top >= priorTop && top - priorTop <= 1);
@@ -159,10 +160,36 @@ void continuityAndPoseIndependence() {
   for (float seconds : {3.9999f, 4.f, 4.0001f}) {
     draw(effects, working(seconds), first.data() + 1);
     for (int x = 176; x < 180; ++x) {
-      for (int y = 0; y <= 5; ++y) assert(first[1 + y * kFrameWidth + x] == 0);
-      for (int y = 91; y <= 97; ++y) assert(first[1 + y * kFrameWidth + x] == 0);
+      for (int y = 0; y <= 5; ++y) assert(first[1 + y * kCharacterFrameWidth + x + kCharacterArtX] == 0);
+      for (int y = 91; y <= 97; ++y) assert(first[1 + y * kCharacterFrameWidth + x + kCharacterArtX] == 0);
     }
   }
+}
+
+void circularOrbitHasClearance() {
+  first.fill(0);
+  second.fill(0);
+  CharacterEffects effects(first.data() + 1, second.data() + 1);
+  constexpr uint16_t leadingColor = 0x5c4e;
+  double minX = kCharacterFrameWidth, maxX = 0, minY = kCharacterFrameHeight, maxY = 0;
+  for (int tick = 0; tick < 360; ++tick) {
+    draw(effects, working(tick / 30.f), first.data() + 1);
+    double x = 0, y = 0;
+    int count = 0;
+    for (size_t pixel = 0; pixel < kPixels; ++pixel) {
+      if (first[pixel + 1] != leadingColor) continue;
+      x += pixel % kCharacterFrameWidth;
+      y += pixel / kCharacterFrameWidth;
+      ++count;
+    }
+    assert(count == 81);  // The leading five-pixel-radius ball is never clipped.
+    x /= count;
+    y /= count;
+    assert(std::abs(std::hypot(x - kCharacterFrameWidth / 2, y - 233) - 200) < .8);
+    minX = std::min(minX, x); maxX = std::max(maxX, x);
+    minY = std::min(minY, y); maxY = std::max(maxY, y);
+  }
+  assert(maxX-minX == 400 && maxY-minY == 400);
 }
 
 void protectionRestorationAndBudget() {
@@ -170,7 +197,7 @@ void protectionRestorationAndBudget() {
   static_assert(sizeof(CharacterEffects) <= 2 * CharacterEffects::kDamageBudget * sizeof(uint32_t) + 64);
   std::array<uint16_t, kPixels> original{};
   for (size_t i = 0; i < kPixels; ++i) {
-    const int x = i % kFrameWidth, y = i / kFrameWidth;
+    const int x = i % kCharacterFrameWidth, y = i / kCharacterFrameWidth;
     original[i] = i % 97 == 0 || (x > 75 && x < 325 && y > 65 && y < 310
         && !(x > 150 && x < 250 && y > 120 && y < 230)) ? 0xa5a5 : 0;
   }
@@ -190,12 +217,12 @@ void protectionRestorationAndBudget() {
     for (size_t i = 0; i < kPixels; ++i) {
       if (original[i]) assert(frame[i] == original[i]);
       if (frame[i] == original[i]) continue;
-      const int x = i % kFrameWidth, y = i / kFrameWidth;
-      const int dx = x - kFrameWidth / 2, dy = y - kDisplaySize / 2;
+      const int x = i % kCharacterFrameWidth, y = i / kCharacterFrameWidth;
+      const int dx = x - kCharacterFrameWidth / 2, dy = y - kDisplaySize / 2;
       assert(int64_t(dx) * dx * 135 * 135 + int64_t(dy) * dy * 160 * 160
           >= int64_t(160) * 160 * 135 * 135);
       ++changed;
-      aboveHead += y < kFrameY + 41 && x >= 176 && x <= 225;
+      aboveHead += y < kFrameY + 41 && x >= 176 + kCharacterArtX && x <= 225 + kCharacterArtX;
     }
     assert(aboveHead > 0);
     assert(changed <= CharacterEffects::kDamageBudget);
@@ -218,6 +245,7 @@ int main(int argc, char**) {
   otherModes(false);
   visibleShapesAndDirection();
   continuityAndPoseIndependence();
+  circularOrbitHasClearance();
   protectionRestorationAndBudget();
   std::cout << "Working bits: visible 0/1 glyphs, opposing motion, wrap/pose continuity, "
                "body protection, restoration, canaries and allocation guard passed\n";

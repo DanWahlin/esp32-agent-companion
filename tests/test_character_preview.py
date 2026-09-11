@@ -22,16 +22,20 @@ class CharacterPreviewTests(unittest.TestCase):
         self.addCleanup(sessions.close_all)
         first, second = sessions.get("character-one"), sessions.get("character-two")
         before, metadata = first.frame({"delta": 0, "playing": False})
-        self.assertEqual(len(before), 372800)
+        self.assertEqual(len(before), 383984)
         self.assertEqual(metadata["index"], "0")
         self.assertEqual(metadata["mode"], "0")
         self.assertTrue(any(before))
-        offset, size = 57 * 400 * 2, 352 * 400 * 2
+        stride = 412 * 2
+        art = before[57*stride:409*stride]
         assets = json.loads((ROOT / "assets/sprite-firmware.json").read_text())
-        self.assertEqual(hashlib.sha256(before[offset:offset+size]).hexdigest(),
+        self.assertEqual(hashlib.sha256(art).hexdigest(),
                          assets["centerRgb565Sha256"][0])
-        self.assertEqual(before[:offset], bytes(offset))
-        self.assertEqual(before[offset+size:], bytes(offset))
+        self.assertEqual(before[:57*stride], bytes(57*stride))
+        self.assertEqual(before[409*stride:], bytes(57*stride))
+        for y in range(57, 409):
+            self.assertEqual(before[y*stride:y*stride+12], bytes(12))
+            self.assertEqual(before[y*stride+812:(y+1)*stride], bytes(12))
         for _ in range(90):
             second.frame({"delta": 1 / 30})
         after, paused = first.frame({"delta": 1000, "playing": False})
@@ -56,14 +60,35 @@ class CharacterPreviewTests(unittest.TestCase):
             previous = current
             for _ in range(240):
                 pixels, current = renderer.frame({"delta": 1 / 30})
-                self.assertEqual(len(pixels), 372800)
-                self.assertLessEqual(abs(int(current["index"]) - int(previous["index"])), 1)
+                self.assertEqual(len(pixels), 383984)
+                spring_handoff = (previous["mode"], previous["direction"], previous["index"],
+                                  current["index"]) == ("1", "8", "23", "0")
+                if not spring_handoff:
+                    self.assertLessEqual(abs(int(current["index"]) - int(previous["index"])), 1)
                 if current["direction"] != previous["direction"]:
                     self.assertEqual(current["index"], "0")
-                    self.assertEqual(previous["index"], "0")
+                    self.assertTrue(previous["index"] == "0" or spring_handoff)
                 previous = current
             expected = 4 if mode == 1 else 0 if mode == 3 else mode
             self.assertEqual(int(current["mode"]), expected)
+
+    def test_spring_settles_to_identical_neutral_within_one_second(self):
+        renderer = self.create()
+        pixels, state = renderer.frame({"mode": 1, "delta": 1/30})
+        frames = []
+        previous = None
+        for _ in range(27):
+            if state["mode"] != "1":
+                self.assertEqual(state["mode"], "0")
+                self.assertEqual(pixels, previous, "Final spring sample is exactly the idle handoff")
+                break
+            self.assertEqual(state["direction"], "8")
+            frames.append(int(state["index"]))
+            previous = pixels
+            pixels, state = renderer.frame({"delta": 1/30})
+        else:
+            self.fail("Spring reaction took longer than 0.9 seconds")
+        self.assertEqual(frames, list(range(24)))
 
     def test_validation_and_bounded_sessions(self):
         renderer = self.create()
@@ -103,7 +128,7 @@ class CharacterPreviewTests(unittest.TestCase):
             self.assertTrue(select.select([renderer.process.stdout], [], [], 5)[0])
             self.assertTrue(renderer.process.stdout.readline().startswith(b"ERR "))
         pixels, _ = renderer.frame({})
-        self.assertEqual(len(pixels), 372800)
+        self.assertEqual(len(pixels), 383984)
         process = subprocess.Popen([str(EXE)], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         output, _ = process.communicate(b"x" * 300 + b"\n", timeout=5)
         self.assertIn(b"exceeds 255 bytes", output)

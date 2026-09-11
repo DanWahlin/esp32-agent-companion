@@ -3,7 +3,8 @@ import io
 from pathlib import Path
 import tempfile
 import unittest
-from tools.device import NonResettingSerial, read_frame_end, parse_memory, validate_memory, request_mode, capture
+from tools.device import (NonResettingSerial, read_frame_end, parse_memory, validate_memory,
+                          request_mode, capture, parse_sd_status, request_storage_status)
 
 
 class Port:
@@ -14,14 +15,45 @@ class Port:
         return next(self.chunks, b"")
 
 
+class StorageTelemetryTests(unittest.TestCase):
+    def test_large_card_and_flash_fallback(self):
+        line = "SD state=pack_missing card=sdhc_sdxc capacity_bytes=63864569856 cache_bytes=0 hits=0 misses=0"
+        status = parse_sd_status(line)
+        self.assertEqual(status["capacity_bytes"], 63864569856)
+        self.assertEqual(status["state"], "pack_missing")
+        self.assertEqual(status["cache_bytes"], 0)
+        self.assertIsNone(parse_sd_status("SD_DETAIL No card writes."))
+
+    def test_invalid_status_fails_explicitly(self):
+        for line in ("SD state=ready", "SD state=ready card=sdhc_sdxc capacity_bytes=-1 cache_bytes=0 hits=0 misses=0"):
+            with self.assertRaises(RuntimeError):
+                parse_sd_status(line)
+
+    def test_query_uses_only_existing_info_command(self):
+        class QueryPort:
+            def __init__(self):
+                self.writes = []
+                self.lines = iter((b"INFO protocol=1\n",
+                                   b"SD state=ready card=sdhc_sdxc capacity_bytes=64000000000 cache_bytes=524288 hits=8 misses=2\n"))
+            def write(self, data):
+                self.writes.append(data)
+            def readline(self):
+                return next(self.lines, b"")
+        port = QueryPort()
+        self.assertEqual(request_storage_status(port)["hits"], 8)
+        self.assertEqual(port.writes, [b"i"])
+        with self.assertRaises(TimeoutError):
+            request_storage_status(port, timeout=0)
+
+
 class FrameProtocolTests(unittest.TestCase):
     def test_legacy_and_full_height_captures(self):
         from PIL import Image
 
         class CapturePort:
-            def __init__(self, height):
-                self.stream = io.BytesIO(f"FRAME_BE 400 {height} {400*height*2}\n".encode()
-                                        + b"\x07\xe0" * (400*height) + b"\nEND_FRAME\n")
+            def __init__(self, width, height):
+                self.stream = io.BytesIO(f"FRAME_BE {width} {height} {width*height*2}\n".encode()
+                                        + b"\x07\xe0" * (width*height) + b"\nEND_FRAME\n")
             def write(self, data):
                 self.written = data
             def readline(self):
@@ -32,9 +64,9 @@ class FrameProtocolTests(unittest.TestCase):
                 return self.stream.readline()
 
         with tempfile.TemporaryDirectory() as directory:
-            for height in (352, 466):
-                port = CapturePort(height)
-                path = Path(directory) / f"{height}.png"
+            for width, height in ((400, 352), (400, 466), (412, 466)):
+                port = CapturePort(width, height)
+                path = Path(directory) / f"{width}-{height}.png"
                 capture(port, path)
                 self.assertEqual(port.written, b"s")
                 with Image.open(path) as image:

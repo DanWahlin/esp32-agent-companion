@@ -15,7 +15,7 @@ class SmoothSurpriseTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.manifest = json.loads((OUTPUT / "animation.json").read_text())
-        cls.track = cls.manifest["directions"]["surprise"]
+        cls.track = json.loads((OUTPUT / "review/smooth-surprise.json").read_text())
         cls.reference = json.loads((APPROVED / "animation.json").read_text())["directions"]["right"]["frames"][0]
         cls.neutral = Image.open(APPROVED / cls.reference["file"]).convert("RGB")
 

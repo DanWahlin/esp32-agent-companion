@@ -1,7 +1,7 @@
 #include "../firmware/Copilot/src/CharacterEffects.h"
 #include "../firmware/Copilot/src/SpriteRenderer.h"
 #include "../firmware/Copilot/src/SpriteStorage.h"
-#include "HostInflate.h"
+#include "HostSpriteInflate.h"
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -16,11 +16,12 @@ int main() {
     std::cerr << spriteStorageError() << '\n';
     return 1;
   }
-  std::vector<uint16_t> first(kFrameWidth * kCharacterFrameHeight), second(first.size());
+  std::vector<uint16_t> first(kCharacterFrameWidth * kCharacterFrameHeight), second(first.size());
   std::vector<uint16_t> openFirst(kSpriteMaxPatchPixels), openSecond(kSpriteMaxPatchPixels);
   std::vector<uint16_t> patch(kSpriteMaxPatchPixels);
   SpriteRenderer renderer(openFirst.data(), openSecond.data(), patch.data(),
-                          first.data() + kCharacterArtOffset, second.data() + kCharacterArtOffset, inflateAtlasHost);
+                          first.data(), second.data(), inflateSpriteHost,
+                          kCharacterFrameWidth, kCharacterFrameHeight);
   CharacterEffects effects(first.data(), second.data());
   CharacterMotion motion(20260911);
   if (motion.error()) {
@@ -51,7 +52,7 @@ int main() {
     const CharacterState state = motion.state();
     uint16_t* frame = useFirst ? first.data() : second.data();
     const auto start = std::chrono::steady_clock::now();
-    if (!effects.restore(frame) || !renderer.render(state.pose, frame + kCharacterArtOffset)
+    if (!effects.restore(frame) || !renderer.render(state.pose, frame)
         || !effects.render(state, frame)) {
       std::cout << "ERR " << (effects.error() ? effects.error() : renderer.error()) << '\n' << std::flush;
       continue;

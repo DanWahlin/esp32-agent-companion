@@ -129,7 +129,7 @@ class NativeCharacterRenderer(NativeRenderer):
             if text.startswith("ERR "):
                 raise ValueError(text[4:])
             fields = text.split()
-            if len(fields) != 12 or fields[0] != "OK" or fields[1] != "372800":
+            if len(fields) != 12 or fields[0] != "OK" or fields[1] != "383984":
                 self.process.terminate()
                 raise RuntimeError("Invalid native character frame header.")
             pixels = self.read(int(fields[1]), deadline)

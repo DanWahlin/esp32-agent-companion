@@ -30,7 +30,7 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
           body: JSON.stringify({session, delta: 0, playing: false}),
         });
         const bytes = new Uint8Array(await response.arrayBuffer());
-        const pixels = document.getElementById('screen').getContext('2d').getImageData(33, 0, 400, 466).data;
+        const pixels = document.getElementById('screen').getContext('2d').getImageData(27, 0, 412, 466).data;
         for (let i = 0, j = 0; i < bytes.length; i += 2, j += 4) {
           const word = (bytes[i] << 8) | bytes[i + 1];
           const expected = [Math.round(((word >> 11) & 31) * 255 / 31),
@@ -38,7 +38,7 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
           for (let channel = 0; channel < 4; channel++)
             if (pixels[j + channel] !== expected[channel]) return false;
         }
-        return bytes.length === 372800;
+        return bytes.length === 383984;
       } finally {
         await fetch('/api/character/close', {method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({session})});
@@ -96,23 +96,8 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
       await page.locator('#play').click();
       await page.locator('#character').click();
       await page.waitForFunction(() => document.getElementById('visible').textContent === 'Surprise');
-      const firstLook = await page.waitForFunction(() => {
-        const [direction, rest] = document.getElementById('pose').textContent.split(':');
-        if (document.getElementById('visible').textContent === 'Surprise'
-            && Number(direction) < 2 && Number(rest.split('/')[0]) >= 7)
-          return {direction: Number(direction)};
-        return false;
-      });
-      const firstDirection = (await firstLook.jsonValue()).direction;
-      await page.screenshot({path: 'build/character-surprise-first-look.png', fullPage: true});
-      await page.waitForFunction(direction => {
-        const [current, rest] = document.getElementById('pose').textContent.split(':');
-        return document.getElementById('visible').textContent === 'Surprise'
-          && Number(current) === direction && Number(rest.split('/')[0]) >= 7;
-      }, firstDirection ^ 1);
-      assert.equal(await page.locator('#pending').textContent(), 'Surprise');
-      await page.screenshot({path: 'build/character-surprise-second-look.png', fullPage: true});
-      await page.waitForFunction(() => document.getElementById('visible').textContent === 'Needs attention');
+      await page.waitForFunction(() => document.getElementById('visible').textContent === 'Needs attention',
+        null, {timeout: 2000});
       await page.locator('[data-mode="3"]').click();
       await page.waitForFunction(() => document.getElementById('visible').textContent === 'Complete');
       await page.waitForFunction(() => document.getElementById('visible').textContent === 'Idle');
@@ -120,13 +105,18 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
         [2, 'working', 'Working'], [4, 'attention', 'Needs attention'],
         [1, 'surprise', 'Surprise'], [3, 'complete', 'Complete'],
       ]) {
+        if (mode === 1) await page.locator('#speed').selectOption('0.25');
         await page.locator(`[data-mode="${mode}"]`).click();
-        await page.waitForFunction(({label}) => document.getElementById('visible').textContent === label
-          && Number(document.getElementById('pose').textContent.split(':')[1].split('/')[0]) >= 21, {label});
+        await page.waitForFunction(({label, mode}) => {
+          const index = Number(document.getElementById('pose').textContent.split(':')[1].split('/')[0]);
+          return document.getElementById('visible').textContent === label
+            && (mode === 1 ? index >= 3 && index <= 7 : index >= 21);
+        }, {label, mode});
         await page.locator('#play').click();
         await page.waitForFunction(() => document.getElementById('connection').textContent === 'Paused');
         await page.waitForTimeout(80);
         await page.screenshot({path: `build/character-${name}.png`, fullPage: true});
+        if (mode === 1) await page.locator('#speed').selectOption('1');
         await page.locator('#play').click();
       }
       await page.waitForFunction(() => document.getElementById('visible').textContent === 'Idle');

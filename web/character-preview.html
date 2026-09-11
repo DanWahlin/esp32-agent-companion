@@ -35,7 +35,7 @@
           <p class="eyebrow">Send a signal</p><h2>What’s happening?</h2>
           <div class="modes" role="group" aria-label="Character modes">
             <button type="button" data-mode="0" aria-pressed="true"><span class="symbol">○</span><span><strong>Idle</strong><small>A natural look around</small></span><span class="key">1</span></button>
-            <button type="button" data-mode="1" aria-pressed="false"><span class="symbol">✧</span><span><strong>Surprise</strong><small>Widening eyes and a quick side-to-side double-take</small></span><span class="key">2</span></button>
+            <button type="button" data-mode="1" aria-pressed="false"><span class="symbol">✧</span><span><strong>Surprise</strong><small>Quick shrink, widening eyes and a spring rebound</small></span><span class="key">2</span></button>
             <button type="button" data-mode="2" aria-pressed="false"><span class="symbol cyan">◌</span><span><strong>Working</strong><small>Focused eyes, slow glances and tiny binary streams</small></span><span class="key">3</span></button>
             <button type="button" data-mode="3" aria-pressed="false"><span class="symbol lilac">✦</span><span><strong>Complete</strong><small>Fireworks and confetti, then idle</small></span><span class="key">4</span></button>
             <button type="button" data-mode="4" aria-pressed="false"><span class="symbol amber">?</span><span><strong>Needs attention</strong><small>Alternating curious eyes and head tilts</small></span><span class="key">5</span></button>
@@ -45,16 +45,16 @@
         </section>
         <section class="notes"><h3>Presence without distraction</h3>
           <p>Working and Needs attention stay active until a new signal arrives. A surprise never answers a waiting question.</p>
-          <p>The touch reaction now widens its eyes a little faster, then makes the same quick left/right double-take as if checking who poked it. The first side varies, with eased turns and a softer final settle. Use ¼× to inspect the motion.</p>
-          <p>Working eases from normal to focused eyes, occasionally looks slowly left or right, then refocuses. Slightly larger 0s and 1s flow between its head and the device’s top edge, with the cyan orbit; the three bottom dots are removed for a cleaner look.</p>
+          <p>The new touch reaction briefly shrinks as its eyes widen, then makes a small spring rebound and settles in about 0.8 seconds once centered. It replaces the long double-take. Use ¼× to inspect the motion.</p>
+          <p>Working eases from normal to focused eyes, occasionally looks slowly left or right, then refocuses. The balls now follow a 400 × 400 circular path with more space around the head. The binary streams remain; the three bottom dots are removed for a cleaner look.</p>
           <p>Needs attention alternates the larger eye and curious head tilt, pausing on each side and easing through center. The question badge stays visible while waiting.</p>
           <p>One C++ motion engine, two persistent framebuffers. Effects touch only black background pixels; the generated face stays intact.</p>
-          <p>This reviewed version is deployed to the device, including the faster surprise opening, full-height binary streams, and cleaner Working display.</p>
+          <p>The spring touch reaction and 400 × 400 circular orbit are now deployed to the device, using the same motion and rendering code as this preview.</p>
           <p id="assets">Checking exported artwork…</p>
         </section>
       </aside>
     </div>
   </main>
-  <footer>400 × 466 native frame · 30 Hz playback · isolated browser session · no PNG substitution</footer>
+  <footer>412 × 466 native frame · 30 Hz playback · isolated browser session · no PNG substitution</footer>
 </body>
 </html>

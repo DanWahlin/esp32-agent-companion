@@ -1,0 +1,12 @@
+{
+  "provider": "Configured Azure image generation",
+  "prompt": "images/logo.prompt.txt",
+  "promptSha256": "c9c4f8cb8da1b3cb2e579615a2b0acad267fa5d240ca96a571f0bcc5345947a6",
+  "sha256": "1b7e4b94601ff66bfbf336278061489df9c01bd01d61ea687547f0ef926ae887",
+  "size": [
+    1536,
+    1024
+  ],
+  "quality": "high",
+  "format": "png"
+}

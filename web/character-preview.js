@@ -4,7 +4,7 @@
   const session = crypto.randomUUID();
   const canvas = document.getElementById('screen');
   const context = canvas.getContext('2d', {alpha: false});
-  const image = context.createImageData(400, 466);
+  const image = context.createImageData(412, 466);
   const play = document.getElementById('play');
   const errorBox = document.getElementById('error');
   let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -61,7 +61,7 @@
         throw new Error(message?.replace(/^Message:\s*/, '') || `Native renderer failed (${response.status}).`);
       }
       const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.length !== 400 * 466 * 2) throw new Error('Native framebuffer has an invalid size.');
+      if (bytes.length !== 412 * 466 * 2) throw new Error('Native framebuffer has an invalid size.');
       for (let i = 0, j = 0; i < bytes.length; i += 2, j += 4) {
         const pixel = (bytes[i] << 8) | bytes[i + 1];
         image.data[j] = Math.round(((pixel >> 11) & 31) * 255 / 31);
@@ -71,7 +71,7 @@
       }
       context.fillStyle = '#000';
       context.fillRect(0, 0, 466, 466);
-      context.putImageData(image, 33, 0);
+      context.putImageData(image, 27, 0);
       const value = key => response.headers.get(`X-Copilot-${key}`);
       const visible = Number(value('mode')), requested = Number(value('requestedMode'));
       document.getElementById('visible').textContent = names[visible];
@@ -86,8 +86,8 @@
         button.setAttribute('aria-pressed', String(Number(button.dataset.mode) === requested)));
       if (pending === null) {
         document.getElementById('status').textContent = visible !== requested
-          ? `Returning through center → ${names[requested]}.`
-          : visible === 1 ? 'A startled double-take. The previous persistent state will resume.'
+          ? `Settling to center → ${names[requested]}.`
+          : visible === 1 ? 'A quick spring recoil. The previous persistent state will resume.'
           : visible === 3 ? 'A celebration, then back to idle.'
           : `${names[visible]}${playing ? ' active' : ' paused'}. New signals take effect through the shared center.`;
       }

@@ -519,7 +519,7 @@ def prepare_review_material(manifest):
 
 
 def publish_reviewed():
-    from smooth_surprise import build_track
+    from spring_surprise import build_track as spring_track
     from alternate_attention import build_track as build_alternate_attention
     candidate = json.loads((OUTPUT / "animation.candidate.json").read_text())
     if candidate["approvedSpriteManifestSha256"] != digest(APPROVED / "animation.json"):
@@ -533,9 +533,9 @@ def publish_reviewed():
                     if image.size != (WIDTH, HEIGHT):
                         raise ValueError(f"Invalid blink dimensions: {filename}")
         track["status"] = "Visually reviewed staged expression track; small independent-render variations remain."
-    candidate["directions"]["surprise"] = build_track()
+    candidate["directions"]["surprise"] = spring_track()
     candidate["directions"]["attention_alternate"] = build_alternate_attention()
-    candidate["status"] = "GPT expression artwork with smooth surprise recoil and alternating attention tilts."
+    candidate["status"] = "GPT expression artwork with one-way spring surprise and alternating attention tilts."
     (OUTPUT / "animation.json").write_text(json.dumps(candidate, indent=2) + "\n")
     print("Published only web/generated-expressions/animation.json; existing sprites remain untouched.")
 

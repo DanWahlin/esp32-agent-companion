@@ -45,13 +45,14 @@ bool CharacterEffects::restore(uint16_t* frame) {
 }
 
 void CharacterEffects::pixel(int x, int y, uint16_t rgb) {
+  x += kCharacterArtX;
   y += kFrameY;
-  if (x < 0 || y < 0 || x >= kFrameWidth || y >= kCharacterFrameHeight || !rgb) return;
+  if (x < 0 || y < 0 || x >= kCharacterFrameWidth || y >= kCharacterFrameHeight || !rgb) return;
   // Protect black facial interiors as well as every non-black artwork pixel.
-  const int dx = x - kFrameWidth / 2, dy = y - kDisplaySize / 2;
+  const int dx = x - kCharacterFrameWidth / 2, dy = y - kDisplaySize / 2;
   if (int64_t(dx) * dx * 135 * 135 + int64_t(dy) * dy * 160 * 160
       < int64_t(160) * 160 * 135 * 135) return;
-  const uint32_t index = y * kFrameWidth + x;
+  const uint32_t index = y * kCharacterFrameWidth + x;
   if (outputs_[active_][index]) return;
   if (counts_[active_] == kDamageBudget) {
     error_ = "Effect damage budget exceeded.";
@@ -116,11 +117,12 @@ bool CharacterEffects::render(const CharacterState& state, uint16_t* frame) {
   const double t = state.effectSeconds;
   constexpr double pi = 3.14159265358979323846;
   if (state.mode == CharacterMode::Working) {
+    constexpr int orbitRadius = 200;
     double x = std::cos(t * pi / 6), y = std::sin(t * pi / 6);
     constexpr double cosine = .9872272833756269, sine = .15931820661424598;
     for (int i = 0; i < 7; ++i) {
-      dot(kFrameWidth / 2 + int(183 * x),
-          kFrameHeight / 2 + int(148 * y), i == 6 ? 5 : 2,
+      dot(kFrameWidth / 2 + int(std::lround(orbitRadius * x)),
+          kFrameHeight / 2 + int(std::lround(orbitRadius * y)), i == 6 ? 5 : 2,
           color(80, 215, 239, .30 + i * .108));
       const double nextX = x * cosine - y * sine;
       y = x * sine + y * cosine;

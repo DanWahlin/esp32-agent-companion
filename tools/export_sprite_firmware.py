@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Export display-ready GPT Image sprites as big-endian RGB565 zlib blocks.
+"""Export display-ready sprites as RGB565 word-Up Zopfli zlib blocks.
 
 Run with the project's Python environment, then run tools/embed_sprites.py.
-Only open poses are stored in full. Blink levels replace one shared rectangle,
+Open poses share one global nonblack crop. Blink levels replace one shared rectangle,
 the union of their changed RGB565 pixels; unchanged poses use no patch data.
 Identical uncompressed blocks share storage, including every center pose.
 The fixed 5-bit bilinear scaler reproduces the former firmware scaler exactly,
 including RGB565 truncation before scaling and float32 pixel-center mapping.
 Outputs are deterministic and unchanged files retain their modification times.
+Prediction resets per block; cached offline compression lives under build/.
 """
 from __future__ import annotations
 
@@ -16,17 +17,17 @@ import hashlib
 import io
 import json
 from pathlib import Path
-import zlib
 
 import numpy as np
 from PIL import Image
-from embed_sprites import EXPRESSION_DIRECTIONS, EXPRESSION_MANIFEST, read_assets_partition
+from embed_sprites import (EXPRESSION_DIRECTIONS, EXPRESSION_MANIFEST, SPRITE_STEPS,
+                          read_assets_partition, track_layout)
+from sprite_compression import CompressionCache, ENCODING
 
 ROOT = Path(__file__).resolve().parents[1]
-WIDTH, HEIGHT, STEPS = 240, 224, 24
-DISPLAY_WIDTH, DISPLAY_HEIGHT, DRAW_WIDTH = 400, 352, 396
+WIDTH, HEIGHT, STEPS = 240, 224, SPRITE_STEPS
+DISPLAY_WIDTH, DISPLAY_HEIGHT, DRAW_WIDTH = 412, 352, 396
 PROFILE = "display-ready"
-ENCODING = "zlib-rgb565-be"
 RESAMPLING = {
     "algorithm": "rgb565-bilinear-5bit-v1",
     "sourceWidth": WIDTH, "sourceHeight": HEIGHT, "drawWidth": DRAW_WIDTH,
@@ -177,23 +178,27 @@ def validate_manifest(manifest, directions=DIRECTIONS, shared_center=True):
 
 
 class BlockStore:
-    def __init__(self):
+    def __init__(self, cache_directory=None):
         self.data = bytearray()
         self.blocks = {}
+        self.cache = CompressionCache() if cache_directory is None else CompressionCache(cache_directory)
         self.referenced_compressed_bytes = 0
         self.referenced_raw_bytes = 0
         self.references = 0
 
-    def add(self, raw):
+    def add(self, raw, width):
         if not raw:
             return {"offset": 0, "size": 0}
+        if type(width) is not int or width <= 0 or len(raw) % (width * 2):
+            raise ValueError("Sprite blocks require complete RGB565 rows and a positive integer width.")
         self.references += 1
         self.referenced_raw_bytes += len(raw)
-        if raw not in self.blocks:
-            compressed = zlib.compress(raw, level=9)
-            self.blocks[raw] = {"offset": len(self.data), "size": len(compressed)}
+        key = (width, raw)
+        if key not in self.blocks:
+            compressed = self.cache.compress(raw, width)
+            self.blocks[key] = {"offset": len(self.data), "size": len(compressed)}
             self.data.extend(compressed)
-        block = self.blocks[raw]
+        block = self.blocks[key]
         self.referenced_compressed_bytes += block["size"]
         return dict(block)
 
@@ -227,10 +232,31 @@ def load_manifests(manifest_path, root=ROOT):
     return inputs
 
 
+def derive_base_bounds(tracks, track_steps):
+    """Prepass only reachable open poses, keeping the logical canvas unchanged."""
+    occupied = np.zeros((DISPLAY_HEIGHT, DISPLAY_WIDTH), dtype=bool)
+    for (direction, path, manifest), count in zip(tracks, track_steps):
+        for frame in manifest["directions"][direction]["frames"][:count]:
+            pixels, _ = read_png(contained_path(path.parent, frame["file"]), (WIDTH, HEIGHT))
+            occupied |= display_pixels(rgb565(pixels)) != 0
+    rows, columns = np.nonzero(occupied)
+    if not len(rows):
+        raise ValueError("Reachable open poses contain no nonblack pixels for a shared base crop.")
+    x, y = int(columns.min()), int(rows.min())
+    return [x, y, int(columns.max()) + 1 - x, int(rows.max()) + 1 - y]
+
+
+def validate_black_padding(pixels, bounds, label):
+    x, y, width, height = bounds
+    if (pixels[:y].any() or pixels[y + height:].any()
+            or pixels[y:y + height, :x].any() or pixels[y:y + height, x + width:].any()):
+        raise ValueError(f"Nonblack pixels outside shared base crop for {label}; refusing to clip artwork.")
+
+
 def build_assets(manifest_path, root=ROOT):
     partition = read_assets_partition(root)
     inputs = load_manifests(manifest_path, root)
-    store = BlockStore()
+    store = BlockStore(root / "build/sprite-compression")
     frames, sources, manifests = [], {}, {}
     centers = None
     source_centers = None
@@ -242,7 +268,11 @@ def build_assets(manifest_path, root=ROOT):
         }
         for direction in directions:
             tracks.append((direction, path, manifest))
-    for direction, track_manifest_path, manifest in tracks:
+    directions = [direction for direction, _, _ in tracks]
+    track_steps, track_offsets = track_layout(directions)
+    base_bounds = derive_base_bounds(tracks, track_steps)
+    base_x, base_y, base_width, base_height = base_bounds
+    for track_index, (direction, track_manifest_path, manifest) in enumerate(tracks):
         track = manifest["directions"][direction]
         source_directory = (track_manifest_path.parent if direction in EXPRESSION_DIRECTIONS
                             else root / "assets/generated-sprites")
@@ -283,6 +313,14 @@ def build_assets(manifest_path, root=ROOT):
                     source_centers = source_hashes
                 elif hashes != centers or source_hashes != source_centers:
                     raise ValueError(f"Center RGB565 blink levels differ for {direction}.")
+            if direction == "surprise" and step == STEPS - 1:
+                if source_hashes != source_centers or [sha256(p.tobytes()) for p in packed] != centers:
+                    raise ValueError("Spring surprise must end at the shared neutral in all five blink states. "
+                                     "Regenerate with: python3 tools/spring_surprise.py")
+            if step >= track_steps[track_index]:
+                continue
+            for level, pixels in enumerate(packed):
+                validate_black_padding(pixels, base_bounds, f"{direction}/{step}/blink-{level}")
             base, *blinks = packed
             x, y, width, height = patch_bounds(base, blinks)
             if width and height:
@@ -292,19 +330,22 @@ def build_assets(manifest_path, root=ROOT):
             max_patch_pixels = max(max_patch_pixels, width * height)
             frames.append({
                 "direction": direction, "step": step,
-                "base": store.add(base.tobytes()),
+                "base": store.add(base[base_y:base_y + base_height,
+                                       base_x:base_x + base_width].tobytes(), base_width),
                 "patchX": x, "patchY": y, "patchWidth": width, "patchHeight": height,
-                "blinks": [store.add(blink[y:y + height, x:x + width].tobytes()) for blink in blinks],
+                "blinks": [store.add(blink[y:y + height, x:x + width].tobytes(), width) for blink in blinks],
             })
     enforce_budget(len(store.data), partition["size"])
     frame_table_bytes = len(frames) * 48
-    metadata_bytes = frame_table_bytes + 4 + 32
+    metadata_bytes = frame_table_bytes + len(tracks) * 3 + 4 + 32
     metadata = {
-        "formatVersion": 3, "profile": PROFILE, "encoding": ENCODING,
+        "formatVersion": 4, "profile": PROFILE, "encoding": ENCODING,
         "storage": "flash-partition", "partition": partition,
         "displayReady": True, "resampling": RESAMPLING,
         "width": DISPLAY_WIDTH, "height": DISPLAY_HEIGHT,
-        "steps": STEPS, "directions": [direction for direction, _, _ in tracks],
+        "baseBounds": base_bounds,
+        "steps": STEPS, "directions": directions,
+        "trackSteps": track_steps, "trackOffsets": track_offsets,
         "frameCount": len(frames), "blinkLevels": BLINK_LEVELS,
         "patchBounds": "union of differences after exact RGB565 conversion and display resampling",
         "maxPatchPixels": max_patch_pixels, "maxPatchBytes": max_patch_pixels * 2,
@@ -331,12 +372,18 @@ def render_header(metadata):
 namespace copilot {{
 constexpr int kSpriteWidth = {metadata['width']};
 constexpr int kSpriteHeight = {metadata['height']};
+constexpr int kSpriteBaseX = {metadata['baseBounds'][0]};
+constexpr int kSpriteBaseY = {metadata['baseBounds'][1]};
+constexpr int kSpriteBaseWidth = {metadata['baseBounds'][2]};
+constexpr int kSpriteBaseHeight = {metadata['baseBounds'][3]};
 constexpr int kSpriteDirections = {len(metadata['directions'])};
 constexpr int kSpriteSteps = {STEPS};
 constexpr int kSpriteFrameCount = {metadata['frameCount']};
 constexpr int kSpriteBlinkLevels = {len(BLINK_LEVELS)};
 constexpr int kSpriteMaxPatchPixels = {metadata['maxPatchPixels']};
 constexpr bool kSpriteDisplayReady = true;
+constexpr uint8_t kSpriteTrackSteps[kSpriteDirections] = {{{", ".join(map(str, metadata['trackSteps']))}}};
+constexpr uint16_t kSpriteTrackOffsets[kSpriteDirections] = {{{", ".join(map(str, metadata['trackOffsets']))}}};
 
 struct SpriteBlock {{
     uint32_t offset;

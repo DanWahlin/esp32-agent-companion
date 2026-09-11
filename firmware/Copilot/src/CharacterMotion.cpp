@@ -50,11 +50,12 @@ bool CharacterMotion::setMode(CharacterMode mode) {
   error_ = nullptr;
   if ((latched(mode) || mode == CharacterMode::Idle) && next_ == mode) return true;
   if (mode != CharacterMode::Surprise) persistent_ = latched(mode) ? mode : CharacterMode::Idle;
+  if (mode_ == CharacterMode::Surprise) repeatSurprise_ = mode == CharacterMode::Surprise;
   next_ = mode;
   ++eventId_;
   effectSeconds_ = 0;
   if (mode_ == CharacterMode::Idle) {
-    idle_.returnToCenter(.65);
+    idle_.returnToCenter(mode == CharacterMode::Surprise ? .35 : .65);
   } else {
     returnExpression();
   }
@@ -79,12 +80,16 @@ void CharacterMotion::beginLeg(uint8_t to, double duration, Phase phase) {
 }
 
 void CharacterMotion::returnExpression() {
-  if (phase_ != Phase::Returning) beginLeg(0, .65, Phase::Returning);
+  // The spring track already settles forward to neutral; reversing would replay the impact.
+  if (phase_ == Phase::SurpriseReaction) return;
+  if (phase_ != Phase::Returning)
+    beginLeg(0, next_ == CharacterMode::Surprise ? .35 : .65, Phase::Returning);
 }
 
 void CharacterMotion::enter(CharacterMode mode) {
   mode_ = mode;
   effectSeconds_ = 0;
+  repeatSurprise_ = false;
   if (mode == CharacterMode::Idle) {
     idle_.setDuration(1.8);
     idle_.setAutomatic(true);
@@ -93,23 +98,22 @@ void CharacterMotion::enter(CharacterMode mode) {
   pose_.direction = 7 + static_cast<uint8_t>(mode);
   pose_.index = 0;
   if (mode == CharacterMode::Working) workWait_ = range(4, 7);
-  if (mode == CharacterMode::Surprise) surpriseLooksRemaining_ = 2;
-  beginLeg(23, mode == CharacterMode::Surprise ? .5 : mode == CharacterMode::Attention ? 1.4 : .95, Phase::Out);
+  if (mode == CharacterMode::Surprise) {
+    beginLeg(23, .75, Phase::SurpriseReaction);
+  } else {
+    beginLeg(23, mode == CharacterMode::Attention ? 1.4 : .95, Phase::Out);
+  }
 }
 
 double CharacterMotion::edgeInterval() {
   if (cachedIndex_ == pose_.index) return cachedInterval_;
   const int steps = std::abs(int(to_) - from_);
   const int travelled = std::abs(int(pose_.index) - from_);
-  cachedInterval_ = duration_ * (inverse(double(travelled + 1) / steps) - inverse(double(travelled) / steps));
+  // Physics is baked into equally spaced spring samples, not a second easing curve.
+  cachedInterval_ = phase_ == Phase::SurpriseReaction ? duration_ / steps
+      : duration_ * (inverse(double(travelled + 1) / steps) - inverse(double(travelled) / steps));
   cachedIndex_ = pose_.index;
   return cachedInterval_;
-}
-
-void CharacterMotion::beginSurpriseLook(uint8_t direction) {
-  pose_.direction = direction;
-  const uint8_t target = static_cast<uint8_t>(range(10, 14));
-  beginLeg(target, .55, Phase::SurpriseLookOut);
 }
 
 void CharacterMotion::advanceExpression(double dt) {
@@ -118,22 +122,9 @@ void CharacterMotion::advanceExpression(double dt) {
     enter(next_);
     return;
   }
-  if (phase_ == Phase::SurpriseCenter && pose_.index == 0) {
-    beginSurpriseLook(static_cast<uint8_t>(range(0, 2)));
-    return;
-  }
-  if (phase_ == Phase::SurpriseLookBack && pose_.index == 0) {
-    if (--surpriseLooksRemaining_) {
-      beginSurpriseLook(pose_.direction ^ 1);
-    } else {
-      next_ = persistent_;
-      enter(next_);
-    }
-    return;
-  }
-  if (phase_ == Phase::SurpriseLookHold) {
-    hold_ -= dt;
-    if (hold_ <= 0) beginLeg(0, surpriseLooksRemaining_ == 2 ? .5 : .65, Phase::SurpriseLookBack);
+  if (phase_ == Phase::SurpriseReaction && pose_.index == 23) {
+    if (next_ == CharacterMode::Surprise && !repeatSurprise_) next_ = persistent_;
+    enter(next_);  // Spring frame 23 and every track's frame 0 are identical.
     return;
   }
   if (phase_ == Phase::WorkUnfocus && pose_.index == 0) {
@@ -172,8 +163,6 @@ void CharacterMotion::advanceExpression(double dt) {
     if (hold_ > 0) return;
     if (mode_ == CharacterMode::Attention) {
       beginLeg(0, 1.4, Phase::AttentionBack);
-    } else if (mode_ == CharacterMode::Surprise) {
-      beginLeg(0, .55, Phase::SurpriseCenter);
     } else if (latched(mode_)) {
       beginLeg(pose_.index == 23 ? 21 : 23, .45, Phase::Micro);
     } else {
@@ -192,16 +181,13 @@ void CharacterMotion::advanceExpression(double dt) {
     if (phase_ == Phase::WorkLookOut) {
       phase_ = Phase::WorkLookHold;
       hold_ = range(.5, 1.2);
-    } else if (phase_ == Phase::SurpriseLookOut) {
-      phase_ = Phase::SurpriseLookHold;
-      hold_ = .12;
     } else if (phase_ != Phase::Returning && phase_ != Phase::WorkUnfocus
                && phase_ != Phase::WorkLookBack && phase_ != Phase::AttentionBack
-               && phase_ != Phase::SurpriseCenter && phase_ != Phase::SurpriseLookBack) {
+               && phase_ != Phase::SurpriseReaction) {
       phase_ = Phase::Hold;
       hold_ = mode_ == CharacterMode::Attention ? range(2.2, 4.2)
           : latched(mode_) ? (pose_.index == 23 ? 1.4 : .9)
-          : mode_ == CharacterMode::Surprise ? .25 : 1.1;
+          : 1.1;
     }
   } else {
     progress_ = std::min(remainder / edgeInterval(), 1.0);

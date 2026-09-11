@@ -5,7 +5,7 @@ namespace copilot {
 enum class CharacterMode : uint8_t { Idle, Surprise, Working, Complete, Attention };
 struct CharacterState {
   SpritePose pose;
-  // Visible track and next destination; they can differ while retracing to center.
+  // Visible track and next destination; transitions settle at a shared-center pose.
   CharacterMode mode = CharacterMode::Idle;
   CharacterMode requestedMode = CharacterMode::Idle;
   // Reset on accepted events/track entry; wraps at 12 s for periodic effects.
@@ -27,14 +27,13 @@ class CharacterMotion {
 
  private:
   enum class Phase { Out, Hold, Micro, Returning, WorkUnfocus, WorkLookOut, WorkLookHold, WorkLookBack,
-                     AttentionBack, SurpriseCenter, SurpriseLookOut, SurpriseLookHold, SurpriseLookBack };
+                     AttentionBack, SurpriseReaction };
   void enter(CharacterMode mode);
   void beginLeg(uint8_t to, double duration, Phase phase);
   void returnExpression();
   double edgeInterval();
   double range(double low, double high);
   void advanceExpression(double dt);
-  void beginSurpriseLook(uint8_t direction);
   SpriteMotion idle_;
   SpritePose pose_;
   CharacterMode mode_ = CharacterMode::Idle;
@@ -44,7 +43,7 @@ class CharacterMotion {
   uint8_t available_;
   uint32_t random_;
   double workWait_ = 0;
-  uint8_t surpriseLooksRemaining_ = 0;
+  bool repeatSurprise_ = false;
   uint8_t from_ = 0, to_ = 23;
   double progress_ = 0, duration_ = .85, hold_ = 0;
   double effectSeconds_ = 0;

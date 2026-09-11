@@ -17,6 +17,31 @@ MEMORY_FIELDS = (
 )
 CHARACTER_MODES = ("idle", "surprise", "working", "complete", "attention")
 
+def parse_sd_status(line):
+    if not line.startswith("SD "):
+        return None
+    match = re.fullmatch(
+        r"SD state=(\w+) card=(\w+) capacity_bytes=(\d+) cache_bytes=(\d+) hits=(\d+) misses=(\d+)", line)
+    if not match:
+        raise RuntimeError(f"Malformed SD telemetry: {line}")
+    state, card, capacity, cache, hits, misses = match.groups()
+    return dict(state=state, card=card, capacity_bytes=int(capacity), cache_bytes=int(cache),
+                hits=int(hits), misses=int(misses))
+
+
+def request_storage_status(port, timeout=10):
+    port.write(b"i")
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        line = port.readline().decode("utf-8", errors="replace").strip()
+        status = parse_sd_status(line)
+        if status is not None:
+            print(line, flush=True)
+            return status
+        if any(marker in line for marker in ("FATAL", "Guru Meditation", "abort()")):
+            raise RuntimeError(f"Storage query failed: {line}")
+    raise TimeoutError("No SD status received; check firmware support and boot completion.")
+
 
 def request_mode(port, mode):
     if mode not in CHARACTER_MODES:
@@ -133,7 +158,7 @@ def capture(port, destination):
         if line.startswith(b"FRAME_BE "):
             _, width, height, size = line.decode("ascii").split()
             width, height, size = int(width), int(height), int(size)
-            if (width, height, size) not in ((400, 352, 281600), (400, 466, 372800)):
+            if (width, height, size) not in ((400, 352, 281600), (400, 466, 372800), (412, 466, 383984)):
                 raise RuntimeError(f"Unexpected framebuffer header: {line!r}")
             raw = bytearray()
             while len(raw) < size and time.monotonic() < deadline:
@@ -148,7 +173,7 @@ def capture(port, destination):
                 (pixels & 31) * 255 // 31,
             ], axis=-1).astype(np.uint8)
             image = Image.new("RGB", (466, 466))
-            image.paste(Image.fromarray(rgb), (33, (466-height)//2))
+            image.paste(Image.fromarray(rgb), ((466-width)//2, (466-height)//2))
             image.save(destination)
             print(f"Captured device framebuffer: {destination}")
             return
@@ -165,6 +190,8 @@ def main():
     parser.add_argument("--capture", type=Path)
     parser.add_argument("--log", type=Path)
     parser.add_argument("--mode", choices=CHARACTER_MODES, help="Send a character event before observation.")
+    parser.add_argument("--storage", action="store_true",
+                        help="Query read-only microSD/pack status before observation; never modifies the card.")
     parser.add_argument("--warmup-seconds", type=float, default=0,
                         help="Log, but exclude, this initial interval before the measured interval.")
     parser.add_argument("--check-memory", action="store_true")
@@ -187,6 +214,9 @@ def main():
     lines, rates, memory, gaps = [], [], [], []
     try:
         port.open()
+        if args.storage:
+            status = request_storage_status(port)
+            print(f"Storage: {status['state']}; card capacity {status['capacity_bytes']:,} bytes", flush=True)
         if args.mode:
             request_mode(port, args.mode)
         measured_start = time.monotonic() + args.warmup_seconds

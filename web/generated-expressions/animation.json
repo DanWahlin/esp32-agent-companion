@@ -4,22 +4,23 @@
   "count": 24,
   "directions": {
     "surprise": {
-      "title": "Smooth surprise / gentle recoil",
+      "title": "Surprise / quick spring recoil and settle",
       "provider": "Azure GPT Image",
+      "derivation": "local-deterministic",
       "source": "references/shared-neutral.png",
       "sourceSha256": "c10f395a4a1174822e23a1bf438d8ab93ae42b9e195c98c0fe28a6b70fdc10bc",
-      "generationProvenance": "web/generated-expressions/review/smooth-surprise-recipe.json",
+      "generationProvenance": "web/generated-expressions/review/surprise-spring-recipe.json",
       "width": 240,
       "height": 224,
       "count": 24,
       "frames": [
         {
-          "file": "surprise-smooth-00.png",
+          "file": "surprise-spring-00.png",
           "blinks": [
-            "surprise-smooth-00-blink-1.png",
-            "surprise-smooth-00-blink-2.png",
-            "surprise-smooth-00-blink-3.png",
-            "surprise-smooth-00-blink-4.png"
+            "surprise-spring-00-blink-1.png",
+            "surprise-spring-00-blink-2.png",
+            "surprise-spring-00-blink-3.png",
+            "surprise-spring-00-blink-4.png"
           ],
           "eyes": [
             [
@@ -35,586 +36,113 @@
               150
             ]
           ],
+          "eyeLocalBounds": [
+            [
+              93,
+              125,
+              107,
+              150
+            ],
+            [
+              133,
+              125,
+              147,
+              150
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.0,
+          "sampleTimeMs": 0.0,
+          "headTransform": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 1.0,
+          "headTranslation": [
+            0.0,
+            0.0
+          ],
           "headRotationDegrees": 0.0,
-          "headTranslation": [
-            0,
-            -0.0
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
           "strength": 0.0,
-          "eyeScale": [
-            [
-              1.0,
-              1.0
-            ],
-            [
-              1.0,
-              1.0
-            ]
-          ],
+          "compression": 0.0,
           "sha256": "c10f395a4a1174822e23a1bf438d8ab93ae42b9e195c98c0fe28a6b70fdc10bc",
-          "blinkMaskState": "visible"
+          "blinkMaskState": "visible",
+          "neutralOverride": true
         },
         {
-          "file": "surprise-smooth-01.png",
+          "file": "surprise-spring-01.png",
           "blinks": [
-            "surprise-smooth-01-blink-1.png",
-            "surprise-smooth-01-blink-2.png",
-            "surprise-smooth-01-blink-3.png",
-            "surprise-smooth-01-blink-4.png"
-          ],
-          "eyes": [
-            [
-              92,
-              123,
-              109,
-              151
-            ],
-            [
-              132,
-              123,
-              149,
-              151
-            ]
-          ],
-          "headRotationDegrees": 0.08695652173913043,
-          "headTranslation": [
-            0,
-            -0.17391304347826086
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.043478260869565216,
-          "eyeScale": [
-            [
-              1.0341614906832297,
-              1.0330434782608695
-            ],
-            [
-              1.031055900621118,
-              1.031304347826087
-            ]
-          ],
-          "sha256": "bf273b7f7ca023b65e5d626e04ce96a16fda6d36e0ef48ee3c39cf24c5b9a343",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-02.png",
-          "blinks": [
-            "surprise-smooth-02-blink-1.png",
-            "surprise-smooth-02-blink-2.png",
-            "surprise-smooth-02-blink-3.png",
-            "surprise-smooth-02-blink-4.png"
-          ],
-          "eyes": [
-            [
-              92,
-              123,
-              109,
-              152
-            ],
-            [
-              132,
-              123,
-              149,
-              152
-            ]
-          ],
-          "headRotationDegrees": 0.17391304347826086,
-          "headTranslation": [
-            0,
-            -0.34782608695652173
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.08695652173913043,
-          "eyeScale": [
-            [
-              1.0683229813664596,
-              1.066086956521739
-            ],
-            [
-              1.062111801242236,
-              1.0626086956521739
-            ]
-          ],
-          "sha256": "6b874c8e58b66311fb7a208874623debda3441e78f5bbd30917be0f09811f6bf",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-03.png",
-          "blinks": [
-            "surprise-smooth-03-blink-1.png",
-            "surprise-smooth-03-blink-2.png",
-            "surprise-smooth-03-blink-3.png",
-            "surprise-smooth-03-blink-4.png"
-          ],
-          "eyes": [
-            [
-              92,
-              123,
-              109,
-              152
-            ],
-            [
-              132,
-              123,
-              149,
-              152
-            ]
-          ],
-          "headRotationDegrees": 0.2608695652173913,
-          "headTranslation": [
-            0,
-            -0.5217391304347826
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.13043478260869565,
-          "eyeScale": [
-            [
-              1.1024844720496894,
-              1.0991304347826087
-            ],
-            [
-              1.093167701863354,
-              1.093913043478261
-            ]
-          ],
-          "sha256": "d8ad8e29912fd27ee18e06652fa175c655fb513ca72d11988d779907e567fcf5",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-04.png",
-          "blinks": [
-            "surprise-smooth-04-blink-1.png",
-            "surprise-smooth-04-blink-2.png",
-            "surprise-smooth-04-blink-3.png",
-            "surprise-smooth-04-blink-4.png"
+            "surprise-spring-01-blink-1.png",
+            "surprise-spring-01-blink-2.png",
+            "surprise-spring-01-blink-3.png",
+            "surprise-spring-01-blink-4.png"
           ],
           "eyes": [
             [
               91,
-              123,
-              109,
+              121,
+              110,
               153
-            ],
-            [
-              132,
-              123,
-              150,
-              153
-            ]
-          ],
-          "headRotationDegrees": 0.34782608695652173,
-          "headTranslation": [
-            0,
-            -0.6956521739130435
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.17391304347826086,
-          "eyeScale": [
-            [
-              1.1366459627329193,
-              1.1321739130434783
-            ],
-            [
-              1.124223602484472,
-              1.1252173913043477
-            ]
-          ],
-          "sha256": "3afec00bcbf64e2eeb43313c03f4e489a3263d22bba236bc35e68c0f8bd7fae5",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-05.png",
-          "blinks": [
-            "surprise-smooth-05-blink-1.png",
-            "surprise-smooth-05-blink-2.png",
-            "surprise-smooth-05-blink-3.png",
-            "surprise-smooth-05-blink-4.png"
-          ],
-          "eyes": [
-            [
-              91,
-              122,
-              110,
-              154
-            ],
-            [
-              132,
-              122,
-              150,
-              154
-            ]
-          ],
-          "headRotationDegrees": 0.43478260869565216,
-          "headTranslation": [
-            0,
-            -0.8695652173913043
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.21739130434782608,
-          "eyeScale": [
-            [
-              1.170807453416149,
-              1.1652173913043478
-            ],
-            [
-              1.15527950310559,
-              1.1565217391304348
-            ]
-          ],
-          "sha256": "d507a38dad1caddd30d21769ed5a7ceeeaf5874ef2186d0acaa5e9b3e9c2c945",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-06.png",
-          "blinks": [
-            "surprise-smooth-06-blink-1.png",
-            "surprise-smooth-06-blink-2.png",
-            "surprise-smooth-06-blink-3.png",
-            "surprise-smooth-06-blink-4.png"
-          ],
-          "eyes": [
-            [
-              91,
-              122,
-              110,
-              154
-            ],
-            [
-              131,
-              121,
-              150,
-              153
-            ]
-          ],
-          "headRotationDegrees": 0.5217391304347826,
-          "headTranslation": [
-            0,
-            -1.0434782608695652
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.2608695652173913,
-          "eyeScale": [
-            [
-              1.204968944099379,
-              1.1982608695652175
-            ],
-            [
-              1.186335403726708,
-              1.1878260869565218
-            ]
-          ],
-          "sha256": "4d35b492105f6d9978dac577ad232a145b9e9bd8645366e02ab83250666a7f6d",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-07.png",
-          "blinks": [
-            "surprise-smooth-07-blink-1.png",
-            "surprise-smooth-07-blink-2.png",
-            "surprise-smooth-07-blink-3.png",
-            "surprise-smooth-07-blink-4.png"
-          ],
-          "eyes": [
-            [
-              91,
-              121,
-              110,
-              155
-            ],
-            [
-              131,
-              121,
-              150,
-              154
-            ]
-          ],
-          "headRotationDegrees": 0.6086956521739131,
-          "headTranslation": [
-            0,
-            -1.2173913043478262
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.30434782608695654,
-          "eyeScale": [
-            [
-              1.2391304347826086,
-              1.231304347826087
-            ],
-            [
-              1.2173913043478262,
-              1.2191304347826086
-            ]
-          ],
-          "sha256": "6b9983f364c83c55f51840e6c5af278ac9c9d3ccd5213a0747e3349df756b772",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-08.png",
-          "blinks": [
-            "surprise-smooth-08-blink-1.png",
-            "surprise-smooth-08-blink-2.png",
-            "surprise-smooth-08-blink-3.png",
-            "surprise-smooth-08-blink-4.png"
-          ],
-          "eyes": [
-            [
-              90,
-              121,
-              110,
-              154
-            ],
-            [
-              131,
-              121,
-              151,
-              154
-            ]
-          ],
-          "headRotationDegrees": 0.6956521739130435,
-          "headTranslation": [
-            0,
-            -1.391304347826087
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.34782608695652173,
-          "eyeScale": [
-            [
-              1.2732919254658386,
-              1.2643478260869565
-            ],
-            [
-              1.2484472049689441,
-              1.2504347826086957
-            ]
-          ],
-          "sha256": "3c44e83f9f11e409731907dfdb4b06628786236ff925639a6d73f1cbeebcf727",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-09.png",
-          "blinks": [
-            "surprise-smooth-09-blink-1.png",
-            "surprise-smooth-09-blink-2.png",
-            "surprise-smooth-09-blink-3.png",
-            "surprise-smooth-09-blink-4.png"
-          ],
-          "eyes": [
-            [
-              90,
-              121,
-              110,
-              155
-            ],
-            [
-              131,
-              121,
-              151,
-              155
-            ]
-          ],
-          "headRotationDegrees": 0.782608695652174,
-          "headTranslation": [
-            0,
-            -1.565217391304348
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.391304347826087,
-          "eyeScale": [
-            [
-              1.3074534161490683,
-              1.2973913043478262
-            ],
-            [
-              1.279503105590062,
-              1.2817391304347825
-            ]
-          ],
-          "sha256": "292e430369bde459342f4b8c17f3a77ccfb2a8b7fd294e548a93612c70379f02",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-10.png",
-          "blinks": [
-            "surprise-smooth-10-blink-1.png",
-            "surprise-smooth-10-blink-2.png",
-            "surprise-smooth-10-blink-3.png",
-            "surprise-smooth-10-blink-4.png"
-          ],
-          "eyes": [
-            [
-              90,
-              120,
-              111,
-              156
-            ],
-            [
-              131,
-              120,
-              151,
-              156
-            ]
-          ],
-          "headRotationDegrees": 0.8695652173913043,
-          "headTranslation": [
-            0,
-            -1.7391304347826086
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.43478260869565216,
-          "eyeScale": [
-            [
-              1.3416149068322982,
-              1.3304347826086955
-            ],
-            [
-              1.31055900621118,
-              1.3130434782608695
-            ]
-          ],
-          "sha256": "cd2262e2e65f5d5bbfc6053e490ea45a291e962c0717d1ea3eb95882086ef9be",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-11.png",
-          "blinks": [
-            "surprise-smooth-11-blink-1.png",
-            "surprise-smooth-11-blink-2.png",
-            "surprise-smooth-11-blink-3.png",
-            "surprise-smooth-11-blink-4.png"
-          ],
-          "eyes": [
-            [
-              90,
-              120,
-              111,
-              156
-            ],
-            [
-              131,
-              120,
-              151,
-              155
-            ]
-          ],
-          "headRotationDegrees": 0.9565217391304348,
-          "headTranslation": [
-            0,
-            -1.9130434782608696
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.4782608695652174,
-          "eyeScale": [
-            [
-              1.375776397515528,
-              1.3634782608695653
-            ],
-            [
-              1.341614906832298,
-              1.3443478260869566
-            ]
-          ],
-          "sha256": "4f81644aa12fea769ff28702715526423f8e85aff2e0d03fea5ca9b3fa49b015",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-12.png",
-          "blinks": [
-            "surprise-smooth-12-blink-1.png",
-            "surprise-smooth-12-blink-2.png",
-            "surprise-smooth-12-blink-3.png",
-            "surprise-smooth-12-blink-4.png"
-          ],
-          "eyes": [
-            [
-              89,
-              120,
-              111,
-              157
             ],
             [
               130,
-              119,
-              152,
-              156
+              121,
+              149,
+              153
             ]
           ],
-          "headRotationDegrees": 1.0434782608695652,
-          "headTranslation": [
-            0,
-            -2.0869565217391304
+          "eyeLocalBounds": [
+            [
+              91,
+              123,
+              109,
+              154
+            ],
+            [
+              131,
+              123,
+              149,
+              154
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.2200829454183872,
+              1.212880230841058
+            ],
+            [
+              1.2000754049258064,
+              1.201676008165213
+            ]
           ],
           "sourceBounds": [
             0,
@@ -623,142 +151,166 @@
             224
           ],
           "sourceIndex": 0,
-          "strength": 0.5217391304347826,
-          "eyeScale": [
+          "sampleTime": 0.043478260869565216,
+          "sampleTimeMs": 34.78260869565217,
+          "headTransform": [
             [
-              1.4099378881987579,
-              1.3965217391304348
+              0.9767002631583098,
+              0.0,
+              2.7959684210028257
             ],
             [
-              1.372670807453416,
-              1.3756521739130434
-            ]
-          ],
-          "sha256": "836b51fa2654eb22ec5ac1ea8dc419bd5072c614a3f2c754ffa48a55d5ffa591",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-13.png",
-          "blinks": [
-            "surprise-smooth-13-blink-1.png",
-            "surprise-smooth-13-blink-2.png",
-            "surprise-smooth-13-blink-3.png",
-            "surprise-smooth-13-blink-4.png"
-          ],
-          "eyes": [
-            [
-              89,
-              119,
-              111,
-              157
+              0.0,
+              0.9767002631583098,
+              1.787226873033172
             ],
             [
-              130,
-              119,
-              152,
-              156
+              0.0,
+              0.0,
+              1.0
             ]
           ],
-          "headRotationDegrees": 1.1304347826086956,
+          "headScale": 0.9767002631583098,
           "headTranslation": [
-            0,
-            -2.260869565217391
+            0.0,
+            -0.8223436532361226
           ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.5652173913043478,
-          "eyeScale": [
-            [
-              1.4440993788819876,
-              1.4295652173913043
-            ],
-            [
-              1.4037267080745341,
-              1.4069565217391304
-            ]
-          ],
-          "sha256": "e1b5a6c641456d9c87b2dbb75eda07ada4cf9ee1b66ba786660b526185ead89e",
-          "blinkMaskState": "expression-preserved"
+          "headRotationDegrees": 0.0,
+          "strength": 0.28010556689612903,
+          "compression": 0.023299736841690143,
+          "sha256": "ec17dc4153ad98734e7d5f5a0e8ce418801d69c6019b0c41c58338f38eef2790",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
         },
         {
-          "file": "surprise-smooth-14.png",
+          "file": "surprise-spring-02.png",
           "blinks": [
-            "surprise-smooth-14-blink-1.png",
-            "surprise-smooth-14-blink-2.png",
-            "surprise-smooth-14-blink-3.png",
-            "surprise-smooth-14-blink-4.png"
+            "surprise-spring-02-blink-1.png",
+            "surprise-spring-02-blink-2.png",
+            "surprise-spring-02-blink-3.png",
+            "surprise-spring-02-blink-4.png"
           ],
           "eyes": [
             [
-              89,
+              90,
               118,
+              112,
+              155
+            ],
+            [
+              129,
+              119,
+              150,
+              155
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              88,
+              121,
+              111,
+              160
+            ],
+            [
+              130,
+              122,
+              152,
+              160
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.5339482163044553,
+              1.5164735474072186
+            ],
+            [
+              1.4854074693676866,
+              1.489290729122628
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.08695652173913043,
+          "sampleTimeMs": 69.56521739130434,
+          "headTransform": [
+            [
+              0.9369132785827039,
+              0.0,
+              7.570406570075534
+            ],
+            [
+              0.0,
+              0.9369132785827039,
+              4.8391226310678945
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.9369132785827039,
+          "headTranslation": [
+            0.0,
+            -2.226590167669272
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.6795704571147613,
+          "compression": 0.06308672141729606,
+          "sha256": "1b2cb456c06336d7905b65702701b593adfcc9c487fd3d862b00ffcb84de2eea",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-03.png",
+          "blinks": [
+            "surprise-spring-03-blink-1.png",
+            "surprise-spring-03-blink-2.png",
+            "surprise-spring-03-blink-3.png",
+            "surprise-spring-03-blink-4.png"
+          ],
+          "eyes": [
+            [
+              89,
+              116,
               113,
-              158
+              156
             ],
             [
-              130,
-              118,
-              152,
-              157
+              128,
+              117,
+              151,
+              156
             ]
           ],
-          "headRotationDegrees": 1.2173913043478262,
-          "headTranslation": [
-            0,
-            -2.4347826086956523
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.6086956521739131,
-          "eyeScale": [
+          "eyeLocalBounds": [
             [
-              1.4782608695652175,
-              1.462608695652174
+              87,
+              120,
+              112,
+              163
             ],
             [
-              1.434782608695652,
-              1.4382608695652175
-            ]
-          ],
-          "sha256": "a8bd42afc19ccc48bd2e9fffa3a2f7d852cd47dc89acf1922cb405eb22710487",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-15.png",
-          "blinks": [
-            "surprise-smooth-15-blink-1.png",
-            "surprise-smooth-15-blink-2.png",
-            "surprise-smooth-15-blink-3.png",
-            "surprise-smooth-15-blink-4.png"
-          ],
-          "eyes": [
-            [
-              89,
-              118,
-              113,
-              159
-            ],
-            [
-              130,
-              118,
+              129,
+              121,
               153,
-              158
+              163
             ]
           ],
-          "headRotationDegrees": 1.3043478260869565,
-          "headTranslation": [
-            0,
-            -2.608695652173913
+          "eyeScale": [
+            [
+              1.7286759187469318,
+              1.704828343224305
+            ],
+            [
+              1.6624326534063014,
+              1.667732114633552
+            ]
           ],
           "sourceBounds": [
             0,
@@ -767,391 +319,73 @@
             224
           ],
           "sourceIndex": 0,
-          "strength": 0.6521739130434783,
-          "eyeScale": [
+          "sampleTime": 0.13043478260869565,
+          "sampleTimeMs": 104.34782608695652,
+          "headTransform": [
             [
-              1.5124223602484472,
-              1.4956521739130435
+              0.9156221115444052,
+              0.0,
+              10.125346614671372
             ],
             [
-              1.46583850931677,
-              1.4695652173913043
+              0.0,
+              0.9156221115444052,
+              6.472280385064443
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
             ]
           ],
-          "sha256": "62db2d347d3756a6b2d121cbe9b5a59673760f73d141cf59e0b6261f68c59efb",
-          "blinkMaskState": "expression-preserved"
+          "headScale": 0.9156221115444052,
+          "headTranslation": [
+            0.0,
+            -2.978043121962167
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.9274057147688222,
+          "compression": 0.08437788845559474,
+          "sha256": "fd6cf34355cfa9b2da49d4d11a55a2a3c32d00eb3048785b3f2d3b98c2992bab",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
         },
         {
-          "file": "surprise-smooth-16.png",
+          "file": "surprise-spring-04.png",
           "blinks": [
-            "surprise-smooth-16-blink-1.png",
-            "surprise-smooth-16-blink-2.png",
-            "surprise-smooth-16-blink-3.png",
-            "surprise-smooth-16-blink-4.png"
+            "surprise-spring-04-blink-1.png",
+            "surprise-spring-04-blink-2.png",
+            "surprise-spring-04-blink-3.png",
+            "surprise-spring-04-blink-4.png"
           ],
           "eyes": [
             [
-              88,
-              118,
+              89,
+              116,
               113,
               158
             ],
             [
-              130,
-              118,
-              154,
-              157
-            ]
-          ],
-          "headRotationDegrees": 1.391304347826087,
-          "headTranslation": [
-            0,
-            -2.782608695652174
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.6956521739130435,
-          "eyeScale": [
-            [
-              1.5465838509316772,
-              1.528695652173913
-            ],
-            [
-              1.4968944099378882,
-              1.5008695652173913
-            ]
-          ],
-          "sha256": "1b7f20ea30fca5022dee5a6475ad7efcde0ff7c04bc229c4f044232ee35de0e0",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-17.png",
-          "blinks": [
-            "surprise-smooth-17-blink-1.png",
-            "surprise-smooth-17-blink-2.png",
-            "surprise-smooth-17-blink-3.png",
-            "surprise-smooth-17-blink-4.png"
-          ],
-          "eyes": [
-            [
-              88,
-              118,
-              113,
-              159
-            ],
-            [
-              130,
-              118,
-              154,
+              128,
+              117,
+              151,
               158
             ]
           ],
-          "headRotationDegrees": 1.4782608695652173,
-          "headTranslation": [
-            0,
-            -2.9565217391304346
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.7391304347826086,
-          "eyeScale": [
-            [
-              1.5807453416149069,
-              1.5617391304347827
-            ],
-            [
-              1.5279503105590062,
-              1.5321739130434782
-            ]
-          ],
-          "sha256": "d98c5f7366f38ec341652819d47635c9ed5e3c1922530e7a33bac69d0736c1b8",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-18.png",
-          "blinks": [
-            "surprise-smooth-18-blink-1.png",
-            "surprise-smooth-18-blink-2.png",
-            "surprise-smooth-18-blink-3.png",
-            "surprise-smooth-18-blink-4.png"
-          ],
-          "eyes": [
-            [
-              88,
-              118,
-              113,
-              159
-            ],
-            [
-              129,
-              116,
-              154,
-              158
-            ]
-          ],
-          "headRotationDegrees": 1.565217391304348,
-          "headTranslation": [
-            0,
-            -3.130434782608696
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.782608695652174,
-          "eyeScale": [
-            [
-              1.6149068322981366,
-              1.5947826086956522
-            ],
-            [
-              1.5590062111801242,
-              1.5634782608695652
-            ]
-          ],
-          "sha256": "64d57b184335dadc31c475d6c9d04b30eac39a31d945ab721951b5f6226498c6",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-19.png",
-          "blinks": [
-            "surprise-smooth-19-blink-1.png",
-            "surprise-smooth-19-blink-2.png",
-            "surprise-smooth-19-blink-3.png",
-            "surprise-smooth-19-blink-4.png"
-          ],
-          "eyes": [
-            [
-              88,
-              116,
-              114,
-              160
-            ],
-            [
-              129,
-              116,
-              154,
-              159
-            ]
-          ],
-          "headRotationDegrees": 1.6521739130434783,
-          "headTranslation": [
-            0,
-            -3.3043478260869565
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.8260869565217391,
-          "eyeScale": [
-            [
-              1.6490683229813665,
-              1.6278260869565218
-            ],
-            [
-              1.5900621118012421,
-              1.594782608695652
-            ]
-          ],
-          "sha256": "54b9304e4bc00baf3cbb0141baf09d6b33a9a6a691ee150868cf25a7fa34baeb",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-20.png",
-          "blinks": [
-            "surprise-smooth-20-blink-1.png",
-            "surprise-smooth-20-blink-2.png",
-            "surprise-smooth-20-blink-3.png",
-            "surprise-smooth-20-blink-4.png"
-          ],
-          "eyes": [
+          "eyeLocalBounds": [
             [
               87,
-              116,
-              114,
-              161
+              120,
+              112,
+              164
             ],
             [
               129,
-              116,
-              155,
-              160
+              121,
+              153,
+              164
             ]
           ],
-          "headRotationDegrees": 1.7391304347826086,
-          "headTranslation": [
-            0,
-            -3.4782608695652173
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.8695652173913043,
-          "eyeScale": [
-            [
-              1.6832298136645965,
-              1.6608695652173913
-            ],
-            [
-              1.62111801242236,
-              1.626086956521739
-            ]
-          ],
-          "sha256": "c21873a55166f27335682ee91ce1690517538d4a39ca4b190f17caa857e7aed1",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-21.png",
-          "blinks": [
-            "surprise-smooth-21-blink-1.png",
-            "surprise-smooth-21-blink-2.png",
-            "surprise-smooth-21-blink-3.png",
-            "surprise-smooth-21-blink-4.png"
-          ],
-          "eyes": [
-            [
-              87,
-              116,
-              114,
-              161
-            ],
-            [
-              129,
-              116,
-              155,
-              160
-            ]
-          ],
-          "headRotationDegrees": 1.826086956521739,
-          "headTranslation": [
-            0,
-            -3.652173913043478
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.9130434782608695,
-          "eyeScale": [
-            [
-              1.7173913043478262,
-              1.6939130434782608
-            ],
-            [
-              1.652173913043478,
-              1.657391304347826
-            ]
-          ],
-          "sha256": "c9137fd850c88304219c681999f4f121a2391cdd07fa63ce985df30125c96d61",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-22.png",
-          "blinks": [
-            "surprise-smooth-22-blink-1.png",
-            "surprise-smooth-22-blink-2.png",
-            "surprise-smooth-22-blink-3.png",
-            "surprise-smooth-22-blink-4.png"
-          ],
-          "eyes": [
-            [
-              87,
-              116,
-              114,
-              162
-            ],
-            [
-              129,
-              116,
-              155,
-              160
-            ]
-          ],
-          "headRotationDegrees": 1.9130434782608696,
-          "headTranslation": [
-            0,
-            -3.8260869565217392
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 0.9565217391304348,
-          "eyeScale": [
-            [
-              1.7515527950310559,
-              1.7269565217391305
-            ],
-            [
-              1.6832298136645962,
-              1.6886956521739132
-            ]
-          ],
-          "sha256": "08e690bb67d7f8164dab911841071421e841942a0e3561f70f8d8f9b4b5cbda3",
-          "blinkMaskState": "expression-preserved"
-        },
-        {
-          "file": "surprise-smooth-23.png",
-          "blinks": [
-            "surprise-smooth-23-blink-1.png",
-            "surprise-smooth-23-blink-2.png",
-            "surprise-smooth-23-blink-3.png",
-            "surprise-smooth-23-blink-4.png"
-          ],
-          "eyes": [
-            [
-              87,
-              116,
-              114,
-              162
-            ],
-            [
-              129,
-              115,
-              155,
-              160
-            ]
-          ],
-          "headRotationDegrees": 2.0,
-          "headTranslation": [
-            0,
-            -4.0
-          ],
-          "sourceBounds": [
-            0,
-            0,
-            240,
-            224
-          ],
-          "sourceIndex": 0,
-          "strength": 1.0,
           "eyeScale": [
             [
               1.7857142857142858,
@@ -1162,12 +396,1643 @@
               1.72
             ]
           ],
-          "sha256": "04d8de18caf8bc3d447c677bd386120c7ebff54f5ea5710d74dce3588a7846d6",
-          "blinkMaskState": "expression-preserved"
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.17391304347826086,
+          "sampleTimeMs": 139.1304347826087,
+          "headTransform": [
+            [
+              0.9238890393673739,
+              0.0,
+              9.133315275915137
+            ],
+            [
+              0.0,
+              0.9238890393673739,
+              5.838158392055563
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.9238890393673739,
+          "headTranslation": [
+            0.0,
+            -2.686269198798568
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 1.0,
+          "compression": 0.0761109606326261,
+          "sha256": "cd4caf3069e0e8c15f88d7176a00193eca709ebb62a57a26ed8bc03a79c9e7fc",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-05.png",
+          "blinks": [
+            "surprise-spring-05-blink-1.png",
+            "surprise-spring-05-blink-2.png",
+            "surprise-spring-05-blink-3.png",
+            "surprise-spring-05-blink-4.png"
+          ],
+          "eyes": [
+            [
+              88,
+              117,
+              113,
+              160
+            ],
+            [
+              128,
+              118,
+              152,
+              160
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              87,
+              120,
+              112,
+              164
+            ],
+            [
+              129,
+              121,
+              153,
+              164
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.744624693843635,
+              1.7202551584087522
+            ],
+            [
+              1.6769315398578497,
+              1.6823469921767127
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.21739130434782608,
+          "sampleTimeMs": 173.91304347826087,
+          "headTransform": [
+            [
+              0.9514961450445265,
+              0.0,
+              5.820462594656817
+            ],
+            [
+              0.0,
+              0.9514961450445265,
+              3.72053099187867
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.9514961450445265,
+          "headTranslation": [
+            0.0,
+            -1.7119007631343577
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.9477041558009898,
+          "compression": 0.04850385495547347,
+          "sha256": "26a3b6f1d85c2c0c780933b1854182677dd98c42ac510b60e2bda8661374b1fb",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-06.png",
+          "blinks": [
+            "surprise-spring-06-blink-1.png",
+            "surprise-spring-06-blink-2.png",
+            "surprise-spring-06-blink-3.png",
+            "surprise-spring-06-blink-4.png"
+          ],
+          "eyes": [
+            [
+              88,
+              119,
+              113,
+              161
+            ],
+            [
+              128,
+              120,
+              152,
+              161
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              88,
+              120,
+              112,
+              162
+            ],
+            [
+              129,
+              121,
+              152,
+              162
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.6503582977852285,
+              1.6290738444031665
+            ],
+            [
+              1.5912348161683894,
+              1.5959646946977366
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.2608695652173913,
+          "sampleTimeMs": 208.69565217391303,
+          "headTransform": [
+            [
+              0.9802834679646297,
+              0.0,
+              2.3659838442444254
+            ],
+            [
+              0.0,
+              0.9802834679646297,
+              1.5123739867131092
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.9802834679646297,
+          "headTranslation": [
+            0.0,
+            -0.6958776012483613
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.8277287426357453,
+          "compression": 0.019716532035370236,
+          "sha256": "ae8a6061835ae527fdfc6a680802ad796c2af161296a1746f35922532e54473d",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-07.png",
+          "blinks": [
+            "surprise-spring-07-blink-1.png",
+            "surprise-spring-07-blink-2.png",
+            "surprise-spring-07-blink-3.png",
+            "surprise-spring-07-blink-4.png"
+          ],
+          "eyes": [
+            [
+              88,
+              120,
+              112,
+              160
+            ],
+            [
+              129,
+              121,
+              152,
+              160
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              88,
+              121,
+              111,
+              160
+            ],
+            [
+              130,
+              122,
+              152,
+              160
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.5369069478571593,
+              1.5193354477454704
+            ],
+            [
+              1.4880972253246902,
+              1.4920020031272876
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.30434782608695654,
+          "sampleTimeMs": 243.47826086956525,
+          "headTransform": [
+            [
+              0.9971005714383682,
+              0.0,
+              0.34793142739582095
+            ],
+            [
+              0.0,
+              0.9971005714383682,
+              0.2224032261392923
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.9971005714383682,
+          "headTranslation": [
+            0.0,
+            -0.10233277276347487
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.6833361154545663,
+          "compression": 0.0028994285616317883,
+          "sha256": "114dcd090aae549cfaae7f3449664c9a9075bfaf08fac78d180d0013318ad0bc",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-08.png",
+          "blinks": [
+            "surprise-spring-08-blink-1.png",
+            "surprise-spring-08-blink-2.png",
+            "surprise-spring-08-blink-3.png",
+            "surprise-spring-08-blink-4.png"
+          ],
+          "eyes": [
+            [
+              88,
+              122,
+              110,
+              159
+            ],
+            [
+              130,
+              122,
+              152,
+              159
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              89,
+              122,
+              110,
+              158
+            ],
+            [
+              130,
+              122,
+              151,
+              158
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.4253394616007828,
+              1.4114192610393026
+            ],
+            [
+              1.3866722378188934,
+              1.3897656157214446
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.34782608695652173,
+          "sampleTimeMs": 278.2608695652174,
+          "headTransform": [
+            [
+              1.0005942491556483,
+              0.0,
+              -0.07130989867779647
+            ],
+            [
+              0.0,
+              1.0005942491556483,
+              -0.045582405821493595
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 1.0005942491556483,
+          "headTranslation": [
+            0.0,
+            0.020973499611114547
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.5413411329464508,
+          "compression": -0.0005942491556482456,
+          "sha256": "9a50da58f9acbc8d08880b4105f317ed8dc3e56cfeaa7ba6a0938abf6c20eda2",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-09.png",
+          "blinks": [
+            "surprise-spring-09-blink-1.png",
+            "surprise-spring-09-blink-2.png",
+            "surprise-spring-09-blink-3.png",
+            "surprise-spring-09-blink-4.png"
+          ],
+          "eyes": [
+            [
+              89,
+              122,
+              110,
+              157
+            ],
+            [
+              131,
+              123,
+              151,
+              157
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              90,
+              122,
+              110,
+              156
+            ],
+            [
+              131,
+              123,
+              150,
+              156
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.3265077400620262,
+              1.3158220322054506
+            ],
+            [
+              1.2968252182382054,
+              1.299199819984111
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.391304347826087,
+          "sampleTimeMs": 313.04347826086956,
+          "headTransform": [
+            [
+              1.0069618824124162,
+              0.0,
+              -0.8354258894899544
+            ],
+            [
+              0.0,
+              1.0069618824124162,
+              -0.5340173332818059
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 1.0069618824124162,
+          "headTranslation": [
+            0.0,
+            0.24571349690880975
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.4155553055334877,
+          "compression": -0.0069618824124162764,
+          "sha256": "7acb036e695a9bddf98cdda24e6b6867d9c3aa2135653340af90b2cf896c78af",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-10.png",
+          "blinks": [
+            "surprise-spring-10-blink-1.png",
+            "surprise-spring-10-blink-2.png",
+            "surprise-spring-10-blink-3.png",
+            "surprise-spring-10-blink-4.png"
+          ],
+          "eyes": [
+            [
+              90,
+              123,
+              109,
+              157
+            ],
+            [
+              131,
+              123,
+              150,
+              157
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              91,
+              123,
+              109,
+              155
+            ],
+            [
+              131,
+              123,
+              149,
+              155
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.2444900678779034,
+              1.2364885747473537
+            ],
+            [
+              1.2222636980708212,
+              1.2240418076553878
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.43478260869565216,
+          "sampleTimeMs": 347.82608695652175,
+          "headTransform": [
+            [
+              1.013848906709031,
+              0.0,
+              -1.6618688050837278
+            ],
+            [
+              0.0,
+              1.013848906709031,
+              -1.0622926087398006
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 1.013848906709031,
+          "headTranslation": [
+            0.0,
+            0.4887849426716805
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.31116917729914967,
+          "compression": -0.01384890670903095,
+          "sha256": "b9e0068b4a011b7a6c8f4e218871d8824e6139513c0ef59e653d2e82f9889fdc",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-11.png",
+          "blinks": [
+            "surprise-spring-11-blink-1.png",
+            "surprise-spring-11-blink-2.png",
+            "surprise-spring-11-blink-3.png",
+            "surprise-spring-11-blink-4.png"
+          ],
+          "eyes": [
+            [
+              90,
+              123,
+              109,
+              156
+            ],
+            [
+              132,
+              124,
+              150,
+              156
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              91,
+              123,
+              109,
+              154
+            ],
+            [
+              132,
+              124,
+              149,
+              154
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.1794317738174371,
+              1.1735594612197755
+            ],
+            [
+              1.1631197943794884,
+              1.1644247527345242
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.4782608695652174,
+          "sampleTimeMs": 382.60869565217394,
+          "headTransform": [
+            [
+              1.0160041099421782,
+              0.0,
+              -1.9204931930613753
+            ],
+            [
+              0.0,
+              1.0160041099421782,
+              -1.2276093743882488
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 1.0160041099421782,
+          "headTranslation": [
+            0.0,
+            0.5648509391356977
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.22836771213128365,
+          "compression": -0.016004109942178105,
+          "sha256": "308d82e0ca57dc473b47bfc6d7dad927ed5b81c68988b728e42798f6c9295460",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-12.png",
+          "blinks": [
+            "surprise-spring-12-blink-1.png",
+            "surprise-spring-12-blink-2.png",
+            "surprise-spring-12-blink-3.png",
+            "surprise-spring-12-blink-4.png"
+          ],
+          "eyes": [
+            [
+              91,
+              124,
+              108,
+              154
+            ],
+            [
+              132,
+              124,
+              149,
+              154
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              92,
+              124,
+              108,
+              153
+            ],
+            [
+              132,
+              124,
+              148,
+              153
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.129517732141763,
+              1.1252789699989418
+            ],
+            [
+              1.1177433928561482,
+              1.1186853399989976
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.5217391304347826,
+          "sampleTimeMs": 417.39130434782606,
+          "headTransform": [
+            [
+              1.012877147854571,
+              0.0,
+              -1.5452577425485288
+            ],
+            [
+              0.0,
+              1.012877147854571,
+              -0.9877529883741621
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 1.012877147854571,
+          "headTranslation": [
+            0.0,
+            0.45448757133779993
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.1648407499986076,
+          "compression": -0.012877147854570998,
+          "sha256": "426882f426fa3afe7535ae46fff98fef72e370c849f43ca3eaece912ccfe0074",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-13.png",
+          "blinks": [
+            "surprise-spring-13-blink-1.png",
+            "surprise-spring-13-blink-2.png",
+            "surprise-spring-13-blink-3.png",
+            "surprise-spring-13-blink-4.png"
+          ],
+          "eyes": [
+            [
+              91,
+              124,
+              108,
+              153
+            ],
+            [
+              132,
+              124,
+              149,
+              153
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              92,
+              124,
+              108,
+              152
+            ],
+            [
+              132,
+              124,
+              148,
+              152
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.092194752520502,
+              1.0891774697107401
+            ],
+            [
+              1.0838134113822746,
+              1.0844839186733328
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.5652173913043478,
+          "sampleTimeMs": 452.17391304347825,
+          "headTransform": [
+            [
+              1.0072140634547433,
+              0.0,
+              -0.8656876145691967
+            ],
+            [
+              0.0,
+              1.0072140634547433,
+              -0.553361102646198
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 1.0072140634547433,
+          "headTranslation": [
+            0.0,
+            0.25461400428505415
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.11733877593518435,
+          "compression": -0.007214063454743202,
+          "sha256": "58bdfc71b7d585aaefdc48d6c451112e8bea65eaefde0685e3b5b1e69ee99e39",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-14.png",
+          "blinks": [
+            "surprise-spring-14-blink-1.png",
+            "surprise-spring-14-blink-2.png",
+            "surprise-spring-14-blink-3.png",
+            "surprise-spring-14-blink-4.png"
+          ],
+          "eyes": [
+            [
+              91,
+              124,
+              108,
+              153
+            ],
+            [
+              132,
+              124,
+              149,
+              153
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              92,
+              124,
+              108,
+              152
+            ],
+            [
+              132,
+              124,
+              148,
+              152
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.064846292471004,
+              1.062724050171953
+            ],
+            [
+              1.05895117497364,
+              1.0594227843734292
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.6086956521739131,
+          "sampleTimeMs": 486.9565217391305,
+          "headTransform": [
+            [
+              1.0023476010024792,
+              0.0,
+              -0.2817121202974988
+            ],
+            [
+              0.0,
+              1.0023476010024792,
+              -0.1800748063078189
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 1.0023476010024792,
+          "headTranslation": [
+            0.0,
+            0.08285650596985328
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.08253164496309612,
+          "compression": -0.002347601002479176,
+          "sha256": "7a7ddf95d60d9ef8e8666cf9779caea2c7f595189fd34c92df08ce88bc206f49",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-15.png",
+          "blinks": [
+            "surprise-spring-15-blink-1.png",
+            "surprise-spring-15-blink-2.png",
+            "surprise-spring-15-blink-3.png",
+            "surprise-spring-15-blink-4.png"
+          ],
+          "eyes": [
+            [
+              91,
+              124,
+              108,
+              152
+            ],
+            [
+              132,
+              124,
+              149,
+              152
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              92,
+              124,
+              108,
+              151
+            ],
+            [
+              132,
+              124,
+              148,
+              151
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.0443389528975031,
+              1.042887859893585
+            ],
+            [
+              1.04030813899773,
+              1.040630604109712
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.6521739130434783,
+          "sampleTimeMs": 521.7391304347826,
+          "headTransform": [
+            [
+              1.0001273982798917,
+              0.0,
+              -0.015287793587006604
+            ],
+            [
+              0.0,
+              1.0001273982798917,
+              -0.009772197469340877
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 1.0001273982798917,
+          "headTranslation": [
+            0.0,
+            0.004496409878531954
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.05643139459682212,
+          "compression": -0.0001273982798917387,
+          "sha256": "c1c93ad50c36a1314ede2dc39024e78ca59b4361d53b8a31b49c1e2ce41309c6",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-16.png",
+          "blinks": [
+            "surprise-spring-16-blink-1.png",
+            "surprise-spring-16-blink-2.png",
+            "surprise-spring-16-blink-3.png",
+            "surprise-spring-16-blink-4.png"
+          ],
+          "eyes": [
+            [
+              92,
+              123,
+              109,
+              151
+            ],
+            [
+              131,
+              123,
+              148,
+              151
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              92,
+              124,
+              108,
+              151
+            ],
+            [
+              132,
+              124,
+              148,
+              151
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.0282825917472322,
+              1.0273569796536866
+            ],
+            [
+              1.0257114470429385,
+              1.025917138619282
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.6956521739130435,
+          "sampleTimeMs": 556.5217391304348,
+          "headTransform": [
+            [
+              0.9996280305422498,
+              0.0,
+              0.044636334930018506
+            ],
+            [
+              0.0,
+              0.9996280305422498,
+              0.028532245465079348
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.9996280305422498,
+          "headTranslation": [
+            0.0,
+            -0.01312833380294645
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.03599602586011386,
+          "compression": 0.0003719694577501494,
+          "sha256": "367c482520594c58b5da5ca9f64dda52fdda3b3c003cd74394e6cd9281e5dc24",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-17.png",
+          "blinks": [
+            "surprise-spring-17-blink-1.png",
+            "surprise-spring-17-blink-2.png",
+            "surprise-spring-17-blink-3.png",
+            "surprise-spring-17-blink-4.png"
+          ],
+          "eyes": [
+            [
+              92,
+              123,
+              109,
+              151
+            ],
+            [
+              131,
+              123,
+              148,
+              151
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              92,
+              124,
+              108,
+              151
+            ],
+            [
+              132,
+              124,
+              148,
+              151
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.0163908169044185,
+              1.0158543901693646
+            ],
+            [
+              1.0149007426403804,
+              1.0150199485815035
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.7391304347826086,
+          "sampleTimeMs": 591.3043478260869,
+          "headTransform": [
+            [
+              0.9986139705195328,
+              0.0,
+              0.166323537656055
+            ],
+            [
+              0.0,
+              0.9986139705195328,
+              0.10631661426642365
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.9986139705195328,
+          "headTranslation": [
+            0.0,
+            -0.04891868754590194
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.020861039696532472,
+          "compression": 0.0013860294804672216,
+          "sha256": "00bf5e529ee67a375377a11232f608e5dbbed4a9e70be9a57b6459798516e291",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-18.png",
+          "blinks": [
+            "surprise-spring-18-blink-1.png",
+            "surprise-spring-18-blink-2.png",
+            "surprise-spring-18-blink-3.png",
+            "surprise-spring-18-blink-4.png"
+          ],
+          "eyes": [
+            [
+              92,
+              123,
+              109,
+              151
+            ],
+            [
+              131,
+              123,
+              148,
+              151
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              92,
+              124,
+              108,
+              151
+            ],
+            [
+              132,
+              124,
+              148,
+              151
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.0084311718396195,
+              1.0081552425794138
+            ],
+            [
+              1.0076647016723814,
+              1.0077260192857604
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.782608695652174,
+          "sampleTimeMs": 626.0869565217391,
+          "headTransform": [
+            [
+              0.998330132842638,
+              0.0,
+              0.20038405888342936
+            ],
+            [
+              0.0,
+              0.998330132842638,
+              0.1280886337176516
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.998330132842638,
+          "headTranslation": [
+            0.0,
+            -0.058936487906891946
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.010730582341334002,
+          "compression": 0.0016698671573619386,
+          "sha256": "d38b7f4b4ce7caa7ab6a4b18bde34a1a6d4ed09b0cdb386d17436c12c655eddb",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-19.png",
+          "blinks": [
+            "surprise-spring-19-blink-1.png",
+            "surprise-spring-19-blink-2.png",
+            "surprise-spring-19-blink-3.png",
+            "surprise-spring-19-blink-4.png"
+          ],
+          "eyes": [
+            [
+              92,
+              123,
+              109,
+              151
+            ],
+            [
+              131,
+              123,
+              148,
+              151
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              92,
+              124,
+              108,
+              151
+            ],
+            [
+              132,
+              124,
+              148,
+              151
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.0037170114653526,
+              1.0035953638173958
+            ],
+            [
+              1.003379101332139,
+              1.003406134142796
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.8260869565217391,
+          "sampleTimeMs": 660.8695652173913,
+          "headTransform": [
+            [
+              0.9988933247655085,
+              0.0,
+              0.13280102813897088
+            ],
+            [
+              0.0,
+              0.9988933247655085,
+              0.08488850033981664
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.9988933247655085,
+          "headTranslation": [
+            0.0,
+            -0.03905912592322948
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.0047307418649943905,
+          "compression": 0.0011066752344915018,
+          "sha256": "0dfa1ea6ee8d37663d280c93fdb6b96460cbe3c9befdb32933585aa06e0737dd",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-20.png",
+          "blinks": [
+            "surprise-spring-20-blink-1.png",
+            "surprise-spring-20-blink-2.png",
+            "surprise-spring-20-blink-3.png",
+            "surprise-spring-20-blink-4.png"
+          ],
+          "eyes": [
+            [
+              92,
+              123,
+              109,
+              151
+            ],
+            [
+              131,
+              123,
+              148,
+              151
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              92,
+              124,
+              108,
+              151
+            ],
+            [
+              132,
+              124,
+              148,
+              151
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.0013130068645055,
+              1.001270035730758
+            ],
+            [
+              1.001193642604096,
+              1.0012031917449287
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.8695652173913043,
+          "sampleTimeMs": 695.6521739130435,
+          "headTransform": [
+            [
+              0.9995825105545529,
+              0.0,
+              0.05009873345365179
+            ],
+            [
+              0.0,
+              0.9995825105545529,
+              0.03202389628605313
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.9995825105545529,
+          "headTranslation": [
+            0.0,
+            -0.0147349216040124
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.0016710996457342693,
+          "compression": 0.00041748944544701803,
+          "sha256": "c4f22dcc2e67ee471170f454e2a3d206c97c3b621e81b37c8b9fb9392cccc70b",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-21.png",
+          "blinks": [
+            "surprise-spring-21-blink-1.png",
+            "surprise-spring-21-blink-2.png",
+            "surprise-spring-21-blink-3.png",
+            "surprise-spring-21-blink-4.png"
+          ],
+          "eyes": [
+            [
+              92,
+              123,
+              109,
+              151
+            ],
+            [
+              131,
+              123,
+              148,
+              151
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              92,
+              124,
+              108,
+              151
+            ],
+            [
+              132,
+              124,
+              148,
+              151
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.0003179141154694,
+              1.0003075096535088
+            ],
+            [
+              1.000289012832245,
+              1.000291324934903
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.9130434782608695,
+          "sampleTimeMs": 730.4347826086956,
+          "headTransform": [
+            [
+              0.999926828396055,
+              0.0,
+              0.008780592473399906
+            ],
+            [
+              0.0,
+              0.999926828396055,
+              0.005612692443787984
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.999926828396055,
+          "headTranslation": [
+            0.0,
+            -0.0025825271980604554
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.0004046179651430126,
+          "compression": 7.317160394504623e-05,
+          "sha256": "38625357eeaec62fbb88670b5d3ef5d5285af4cd507e815a51bcef243cfc1821",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-22.png",
+          "blinks": [
+            "surprise-spring-22-blink-1.png",
+            "surprise-spring-22-blink-2.png",
+            "surprise-spring-22-blink-3.png",
+            "surprise-spring-22-blink-4.png"
+          ],
+          "eyes": [
+            [
+              92,
+              123,
+              109,
+              151
+            ],
+            [
+              131,
+              123,
+              148,
+              151
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              92,
+              124,
+              108,
+              151
+            ],
+            [
+              132,
+              124,
+              148,
+              151
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.0000317937679737,
+              1.0000307532446582
+            ],
+            [
+              1.0000289034254306,
+              1.000029134652834
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 0.9565217391304348,
+          "sampleTimeMs": 765.2173913043479,
+          "headTransform": [
+            [
+              0.9999973715204448,
+              0.0,
+              0.0003154175466306697
+            ],
+            [
+              0.0,
+              0.9999973715204448,
+              0.00020161984353713757
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 0.9999973715204448,
+          "headTranslation": [
+            0.0,
+            -9.276986665432963e-05
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 4.046479560293357e-05,
+          "compression": 2.6284795552060064e-06,
+          "sha256": "2b296f71318a6c3cc8f182c803f50f5cd74a1cc57781ffefded48587c443e79d",
+          "blinkMaskState": "expression-preserved",
+          "neutralOverride": false
+        },
+        {
+          "file": "surprise-spring-23.png",
+          "blinks": [
+            "surprise-spring-23-blink-1.png",
+            "surprise-spring-23-blink-2.png",
+            "surprise-spring-23-blink-3.png",
+            "surprise-spring-23-blink-4.png"
+          ],
+          "eyes": [
+            [
+              93,
+              125,
+              107,
+              150
+            ],
+            [
+              133,
+              125,
+              147,
+              150
+            ]
+          ],
+          "eyeLocalBounds": [
+            [
+              93,
+              125,
+              107,
+              150
+            ],
+            [
+              133,
+              125,
+              147,
+              150
+            ]
+          ],
+          "eyeScale": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "sourceBounds": [
+            0,
+            0,
+            240,
+            224
+          ],
+          "sourceIndex": 0,
+          "sampleTime": 1.0,
+          "sampleTimeMs": 800.0,
+          "headTransform": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "headScale": 1.0,
+          "headTranslation": [
+            0.0,
+            0.0
+          ],
+          "headRotationDegrees": 0.0,
+          "strength": 0.0,
+          "compression": 0.0,
+          "sha256": "c10f395a4a1174822e23a1bf438d8ab93ae42b9e195c98c0fe28a6b70fdc10bc",
+          "blinkMaskState": "visible",
+          "neutralOverride": true
         }
       ],
-      "sheet": "review/smooth-surprise-contact.png",
-      "rendering": "localized-eye-light-rigid-recoil",
+      "sheet": "review/surprise-spring-contact.png",
+      "rendering": "localized-eye-light-uniform-spring",
       "eyeRegions": [
         [
           77,
@@ -1196,11 +2061,57 @@
           164
         ]
       ],
-      "recoilDegrees": 2.0,
-      "recoilRise": 4.0,
-      "processing": "Approved GPT head with monotonic subpixel eye lights, followed by a single rigid rotation and translation. No head morph, scaling, crossfade, or independently generated eye shapes.",
-      "status": "Web-review candidate; replaces the rejected jittery surprise sequence.",
-      "blinkPolicy": "expression-preserved",
+      "durationMs": 800,
+      "sampleTimesMs": [
+        0.0,
+        34.78260869565217,
+        69.56521739130434,
+        104.34782608695652,
+        139.1304347826087,
+        173.91304347826087,
+        208.69565217391303,
+        243.47826086956522,
+        278.2608695652174,
+        313.04347826086956,
+        347.82608695652175,
+        382.60869565217394,
+        417.39130434782606,
+        452.17391304347825,
+        486.95652173913044,
+        521.7391304347826,
+        556.5217391304348,
+        591.304347826087,
+        626.0869565217391,
+        660.8695652173913,
+        695.6521739130435,
+        730.4347826086956,
+        765.2173913043479,
+        800.0
+      ],
+      "springMotion": {
+        "maxCompressionPercent": 8.437789,
+        "compressionPeakFrame": 3,
+        "compressionPeakMs": 104.347826,
+        "maxOversizePercent": 1.600411,
+        "reboundPeakFrame": 11,
+        "reboundPeakMs": 382.608696,
+        "eyePeakFrame": 4,
+        "eyePeakMs": 139.130435,
+        "maxUpwardRecoilPixels": 2.978043,
+        "settledFrame": 23,
+        "settledAtMs": 800
+      },
+      "sampling": "uniform-time",
+      "neutralFrames": [
+        0,
+        23
+      ],
+      "terminalFrame": 23,
+      "interruptionPolicy": "finish-forward-to-frame-23",
+      "playback": "One-way samples 0..23, already timed by physics. No additional easing and no reversed return.",
+      "processing": "Approved eye-light render followed by one whole-image uniform scale and translation. No nonuniform head warp, crossfade, mirrored head, or new image generation.",
+      "status": "Web-only review candidate; no payload export or device upload performed.",
+      "blinkPolicy": "expression-preserved-between-neutral-endpoints",
       "recommendedPlaybackIndices": [
         0,
         1,
@@ -1231,7 +2142,7 @@
         23
       ],
       "recommendedLoopFrameMs": 120,
-      "qualityNotes": "Original endpoint eye geometry is preserved relative to the head. A two-degree tilt and four-source-pixel lift ease out with the widening eyes, then settle by retracing the exact frames. All original GPT surprise images remain untouched."
+      "qualityNotes": "Finite-onset 8.5% compression, one approximately 1.6% oversized rebound, and a tiny settling tail. Eye widening reaches the unchanged approved target geometry, then relaxes. Both endpoints and all five blink levels are exact shared neutral. All earlier surprise artwork is retained."
     },
     "working": {
       "title": "GPT Image working expression",

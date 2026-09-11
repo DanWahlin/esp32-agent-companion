@@ -1,5 +1,6 @@
 #include "../firmware/Copilot/src/SpriteRenderer.h"
-#include "../tools/HostInflate.h"
+#include "../firmware/Copilot/src/SpriteStorage.h"
+#include "../tools/HostSpriteInflate.h"
 #include <algorithm>
 #include <cassert>
 #include <cstring>
@@ -10,18 +11,25 @@
 using namespace copilot;
 static unsigned calls = 0;
 static bool failInflate = false;
-static bool inflate(uint8_t* output, size_t size, const uint8_t* input, size_t compressed) {
+static bool inflate(uint8_t* output, size_t size, const uint8_t* input, size_t compressed, size_t width, size_t stride) {
   ++calls;
   if (failInflate) {
     std::memset(output, 0xa5, std::min<size_t>(128, size));
     return false;
   }
-  return inflateAtlasHost(output, size, input, compressed);
+  return inflateSpriteHost(output, size, input, compressed, width, stride);
 }
 
 int main() {
+  assert(initializeSpriteStorage());
+  const auto flash = acquireSpriteBlock(0, kSpriteDataSize);
+  assert(flash.data == kSpriteData && flash.slot == -1);
+  releaseSpriteBlock(flash);
+  assert(!acquireSpriteBlock(kSpriteDataSize, 1).data);
+  assert(!acquireSpriteBlock(0, 0).data);
+  assert(!acquireSpriteBlock(1, kSpriteDataSize).data);
   constexpr size_t sourcePixels = kSpriteWidth * kSpriteHeight;
-  constexpr size_t outputPixels = kFrameWidth * kFrameHeight;
+  constexpr size_t outputPixels = sourcePixels;
   std::vector<uint16_t> expected(sourcePixels);
   const size_t guardedPatch = std::max<size_t>(1, kSpriteMaxPatchPixels) + 2;
   std::vector<uint16_t> firstOpen(guardedPatch, 0xa55a), secondOpen(guardedPatch, 0xa55a);
@@ -30,25 +38,37 @@ int main() {
   uint16_t* frame = guarded.data() + 1;
   SpriteRenderer renderer(firstOpen.data() + 1, secondOpen.data() + 1, patch.data() + 1,
                           frame, second.data(), inflate);
+  constexpr size_t canvasPixels = kCharacterFrameWidth * kCharacterFrameHeight;
+  std::vector<uint16_t> canvas(canvasPixels + 2, 0xa55a), otherCanvas(canvasPixels);
+  std::vector<uint16_t> expectedCanvas(canvasPixels);
+  std::vector<uint16_t> canvasOpen(guardedPatch), otherOpen(guardedPatch), canvasPatch(guardedPatch);
+  uint16_t* canvasFrame = canvas.data() + 1;
+  SpriteRenderer expanded(canvasOpen.data(), otherOpen.data(), canvasPatch.data(),
+                          canvasFrame, otherCanvas.data(), inflate,
+                          kCharacterFrameWidth, kCharacterFrameHeight);
   std::ofstream hashes("build/sprite-renderer-pixels.fnv");
   for (int index = 0; index < kSpriteFrameCount; ++index) {
     const auto& metadata = kSpriteFrames[index];
     unsigned visit = 0;
     for (int level : {0, 1, 2, 3, 4, 3, 2, 1, 0}) {
-      assert(inflateAtlasHost(reinterpret_cast<uint8_t*>(expected.data()), sourcePixels * 2,
-                              kSpriteData + metadata.base.offset, metadata.base.size));
+      std::fill(expected.begin(), expected.end(), 0);
+      auto* base = expected.data() + kSpriteBaseY * kSpriteWidth + kSpriteBaseX;
+      assert(inflateSpriteHost(reinterpret_cast<uint8_t*>(base), kSpriteBaseWidth * kSpriteBaseHeight * 2,
+                              kSpriteData + metadata.base.offset, metadata.base.size, kSpriteBaseWidth, kSpriteWidth));
       if (level && metadata.patchWidth) {
         std::vector<uint16_t> changes(metadata.patchWidth * metadata.patchHeight);
         const auto& block = metadata.blinks[level - 1];
-        assert(inflateAtlasHost(reinterpret_cast<uint8_t*>(changes.data()), changes.size() * 2,
-                                kSpriteData + block.offset, block.size));
+        assert(inflateSpriteHost(reinterpret_cast<uint8_t*>(changes.data()), changes.size() * 2,
+                                kSpriteData + block.offset, block.size, metadata.patchWidth, metadata.patchWidth));
         for (int y = 0; y < metadata.patchHeight; ++y) {
           std::copy_n(changes.data() + y * metadata.patchWidth, metadata.patchWidth,
                       expected.data() + (metadata.patchY + y) * kSpriteWidth + metadata.patchX);
         }
       }
-      SpritePose pose{static_cast<uint8_t>(index / kSpriteSteps),
-                      static_cast<uint8_t>(index % kSpriteSteps), static_cast<uint8_t>(level)};
+      uint8_t direction = 0;
+      while (direction + 1 < kSpriteDirections && kSpriteTrackOffsets[direction + 1] <= index) ++direction;
+      SpritePose pose{direction, static_cast<uint8_t>(index - kSpriteTrackOffsets[direction]),
+                      static_cast<uint8_t>(level)};
       const auto previousSecond = second;
       assert(renderer.render(pose, frame));
       assert(second == previousSecond);
@@ -59,6 +79,14 @@ int main() {
       }
       if (visit++ < kSpriteBlinkLevels) hashes << index << " " << level << " " << hash << "\n";
       assert(std::memcmp(frame, expected.data(), outputPixels * 2) == 0);
+      for (int y = 0; y < kSpriteHeight; ++y)
+        std::copy_n(expected.data() + y * kSpriteWidth, kSpriteWidth,
+                    expectedCanvas.data() + (y + kFrameY) * kCharacterFrameWidth);
+      assert(expanded.render(pose, canvasFrame));
+      assert(std::equal(expectedCanvas.begin(), expectedCanvas.end(), canvasFrame));
+      assert(expanded.render(pose, otherCanvas.data()));
+      assert(expectedCanvas == otherCanvas);
+      assert(canvas.front() == 0xa55a && canvas.back() == 0xa55a);
       assert(guarded.front() == 0xa55a && guarded.back() == 0xa55a);
       const unsigned before = calls;
       assert(renderer.render(pose, frame));
@@ -85,6 +113,11 @@ int main() {
   assert(calls == centerCalls);
   assert(!renderer.render({static_cast<uint8_t>(kSpriteDirections), 0, 0}, frame) && renderer.error());
   assert(!renderer.render({0, 24, 0}, frame) && renderer.error());
+  for (uint8_t direction : {2, 3}) {
+    assert(kSpriteTrackSteps[direction] == 12);
+    assert(renderer.render({direction, 11, 0}, frame));
+    assert(!renderer.render({direction, 12, 0}, frame) && renderer.error());
+  }
   assert(!renderer.render({0, 0, 5}, frame) && renderer.error());
   assert(!renderer.render({0, 0, 0}, nullptr) && renderer.error());
   assert(!renderer.render({0, 0, 0}, expected.data()) && renderer.error());
@@ -105,8 +138,21 @@ int main() {
   SpriteRenderer aliased(firstOpen.data() + 1, firstOpen.data() + 1, patch.data() + 1,
                          frame, second.data(), inflate);
   assert(!aliased.render({0, 0, 0}, frame) && aliased.error());
+  assert(expanded.render({0, 0, 0}, canvasFrame));
+  const std::vector<uint16_t> previousCanvas(canvasFrame, canvasFrame + canvasPixels);
+  failInflate = true;
+  assert(!expanded.render({4, 12, 0}, canvasFrame) && expanded.error());
+  failInflate = false;
+  assert(expanded.render({0, 0, 0}, canvasFrame));
+  assert(std::equal(previousCanvas.begin(), previousCanvas.end(), canvasFrame));
+  SpriteRenderer tooSmall(canvasOpen.data(), otherOpen.data(), canvasPatch.data(),
+                          canvasFrame, otherCanvas.data(), inflate, 399, 466);
+  assert(!tooSmall.render({0, 0, 0}, canvasFrame) && tooSmall.error());
+  SpriteRenderer wrongStride(canvasOpen.data(), otherOpen.data(), canvasPatch.data(),
+                             canvasFrame, otherCanvas.data(), inflate, 414, 466);
+  assert(!wrongStride.render({0, 0, 0}, canvasFrame) && wrongStride.error());
   std::ofstream image("build/sprite-host-frame.ppm", std::ios::binary);
-  image << "P6\n" << kFrameWidth << " " << kFrameHeight << "\n255\n";
+  image << "P6\n" << kSpriteWidth << " " << kSpriteHeight << "\n255\n";
   for (size_t i = 0; i < outputPixels; ++i) {
     const uint16_t color = __builtin_bswap16(frame[i]);
     const char rgb[] = {static_cast<char>((color >> 11) * 255 / 31),

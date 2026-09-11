@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUTS = Path("build/firmware-inputs.json")
 BUNDLE = Path("build/firmware-bundle.json")
 BINARIES = tuple(Path("build/firmware") / f"Copilot.ino{suffix}.bin"
-                 for suffix in ("", ".bootloader", ".partitions"))
+                 for suffix in ("", ".bootloader", ".partitions")) + (Path("build/firmware/boot_app0.bin"),)
 
 
 def digest(path):

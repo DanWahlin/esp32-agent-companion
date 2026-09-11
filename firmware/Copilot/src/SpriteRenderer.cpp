@@ -1,12 +1,16 @@
 #include "SpriteRenderer.h"
+#include "SpriteStorage.h"
 #include <cstring>
 #ifdef ARDUINO_ARCH_ESP32
 #include <esp_timer.h>
 #endif
 
 namespace copilot {
-static_assert(kSpriteDisplayReady && kSpriteWidth == kFrameWidth && kSpriteHeight == kFrameHeight,
+static_assert(kSpriteDisplayReady && kSpriteWidth == kCharacterFrameWidth && kSpriteHeight == kFrameHeight,
               "Export display-ready sprites before building the firmware.");
+static_assert(kSpriteBaseX >= 0 && kSpriteBaseY >= 0 && kSpriteBaseWidth > 0 && kSpriteBaseHeight > 0
+              && kSpriteBaseX + kSpriteBaseWidth <= kSpriteWidth
+              && kSpriteBaseY + kSpriteBaseHeight <= kSpriteHeight, "Invalid exported sprite bounds.");
 namespace {
 uint64_t microsNow() {
 #ifdef ARDUINO_ARCH_ESP32
@@ -18,17 +22,25 @@ uint64_t microsNow() {
 }
 
 SpriteRenderer::SpriteRenderer(uint16_t* firstOpenPatch, uint16_t* secondOpenPatch, uint16_t* patch,
-                               uint16_t* firstOutput, uint16_t* secondOutput, InflateSprite inflate)
+                               uint16_t* firstOutput, uint16_t* secondOutput, InflateSprite inflate,
+                               int outputWidth, int outputHeight)
     : openPatches_{firstOpenPatch, secondOpenPatch}, patch_(patch),
-      outputs_{firstOutput, secondOutput}, inflate_(inflate) {}
+      outputs_{firstOutput, secondOutput}, outputWidth_(outputWidth), outputHeight_(outputHeight), inflate_(inflate) {}
 
-bool SpriteRenderer::decode(const SpriteBlock& block, uint16_t* output, size_t pixels) {
+bool SpriteRenderer::decode(const SpriteBlock& block, uint16_t* output, size_t pixels, size_t width, size_t stride) {
   if (!block.size || block.offset > kSpriteDataSize || block.size > kSpriteDataSize - block.offset) {
     error_ = "Sprite block lies outside the embedded asset data.";
     return false;
   }
-  if (!inflate_(reinterpret_cast<uint8_t*>(output), pixels * sizeof(uint16_t),
-                kSpriteData + block.offset, block.size)) {
+  const auto source = acquireSpriteBlock(block.offset, block.size);
+  if (!source.data) {
+    error_ = "Sprite asset source is unavailable.";
+    return false;
+  }
+  const bool decoded = inflate_(reinterpret_cast<uint8_t*>(output), pixels * sizeof(uint16_t),
+                                source.data, block.size, width, stride);
+  releaseSpriteBlock(source);
+  if (!decoded) {
     error_ = "Sprite asset decompression failed.";
     return false;
   }
@@ -44,8 +56,14 @@ bool SpriteRenderer::render(const SpritePose& pose, uint16_t* frame) {
     error_ = "Sprite renderer requires initialized storage and distinct persistent buffers.";
     return false;
   }
-  if (pose.direction >= kSpriteDirections || pose.index >= kSpriteSteps || pose.blinkLevel >= kSpriteBlinkLevels) {
+  if (pose.direction >= kSpriteDirections || pose.index >= kSpriteTrackSteps[pose.direction]
+      || pose.blinkLevel >= kSpriteBlinkLevels) {
     error_ = "Invalid discrete sprite pose.";
+    return false;
+  }
+  if (outputWidth_ != kSpriteWidth || outputHeight_ < kSpriteHeight
+      || outputWidth_ > kDisplaySize || outputHeight_ > kDisplaySize) {
+    error_ = "Sprite output must match the exported stride and fit the artwork and display.";
     return false;
   }
   const int outputIndex = frame == outputs_[0] ? 0 : frame == outputs_[1] ? 1 : -1;
@@ -53,15 +71,17 @@ bool SpriteRenderer::render(const SpritePose& pose, uint16_t* frame) {
     error_ = "Sprite output buffer is not registered.";
     return false;
   }
-  const unsigned index = pose.direction * kSpriteSteps + pose.index;
+  const unsigned index = kSpriteTrackOffsets[pose.direction] + pose.index;
   const uint32_t key = index * kSpriteBlinkLevels + pose.blinkLevel;
   if (outputKeys_[outputIndex] == key) return true;
   const SpriteFrame& entry = kSpriteFrames[index];
+  const int top = (outputHeight_ - kSpriteHeight) / 2;
+  uint16_t* art = frame + top * outputWidth_;
   const size_t patchPixels = static_cast<size_t>(entry.patchWidth) * entry.patchHeight;
   if ((entry.patchWidth == 0) != (entry.patchHeight == 0)
-      || entry.patchX > kFrameWidth || entry.patchY > kFrameHeight
-      || entry.patchWidth > kFrameWidth - entry.patchX
-      || entry.patchHeight > kFrameHeight - entry.patchY
+      || entry.patchX > kSpriteWidth || entry.patchY > kSpriteHeight
+      || entry.patchWidth > kSpriteWidth - entry.patchX
+      || entry.patchHeight > kSpriteHeight - entry.patchY
       || patchPixels > kSpriteMaxPatchPixels) {
     error_ = "Sprite blink patch lies outside its frame or buffer.";
     return false;
@@ -77,14 +97,27 @@ bool SpriteRenderer::render(const SpritePose& pose, uint16_t* frame) {
         && cached.patchWidth == entry.patchWidth && cached.patchHeight == entry.patchHeight;
   }
   if (!sameBase) {
+    const bool initializePadding = baseKeys_[outputIndex] == UINT32_MAX;
     baseKeys_[outputIndex] = UINT32_MAX;
     uint64_t started = microsNow();
-    if (!decode(entry.base, frame, kFrameWidth * kFrameHeight)) return false;
+    if (!decode(entry.base, art + kSpriteBaseY * outputWidth_ + kSpriteBaseX,
+                kSpriteBaseWidth * kSpriteBaseHeight, kSpriteBaseWidth, outputWidth_)) return false;
     decodeUs = microsNow() - started;
     started = microsNow();
+    if (initializePadding) {
+      const int baseTop = top + kSpriteBaseY;
+      std::memset(frame, 0, baseTop * outputWidth_ * sizeof(uint16_t));
+      std::memset(frame + (baseTop + kSpriteBaseHeight) * outputWidth_, 0,
+                  (outputHeight_ - baseTop - kSpriteBaseHeight) * outputWidth_ * sizeof(uint16_t));
+      for (int y = baseTop; y < baseTop + kSpriteBaseHeight; ++y) {
+        std::memset(frame + y * outputWidth_, 0, kSpriteBaseX * sizeof(uint16_t));
+        std::memset(frame + y * outputWidth_ + kSpriteBaseX + kSpriteBaseWidth, 0,
+                    (outputWidth_ - kSpriteBaseX - kSpriteBaseWidth) * sizeof(uint16_t));
+      }
+    }
     for (int y = 0; y < entry.patchHeight; ++y) {
       std::memcpy(openPatches_[outputIndex] + y * entry.patchWidth,
-                  frame + (entry.patchY + y) * kFrameWidth + entry.patchX,
+                  art + (entry.patchY + y) * outputWidth_ + entry.patchX,
                   entry.patchWidth * sizeof(uint16_t));
     }
     compositeUs = microsNow() - started;
@@ -95,11 +128,11 @@ bool SpriteRenderer::render(const SpritePose& pose, uint16_t* frame) {
   if (patchPixels) {
     const uint16_t* pixels = openPatches_[outputIndex];
     if (pose.blinkLevel) {
-      if (!decode(entry.blinks[pose.blinkLevel - 1], patch_, patchPixels)) return false;
+      if (!decode(entry.blinks[pose.blinkLevel - 1], patch_, patchPixels, entry.patchWidth, entry.patchWidth)) return false;
       pixels = patch_;
     }
     for (int y = 0; y < entry.patchHeight; ++y) {
-      std::memcpy(frame + (entry.patchY + y) * kFrameWidth + entry.patchX,
+      std::memcpy(art + (entry.patchY + y) * outputWidth_ + entry.patchX,
                   pixels + y * entry.patchWidth, entry.patchWidth * sizeof(uint16_t));
     }
   }

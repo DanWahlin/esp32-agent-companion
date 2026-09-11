@@ -1,4 +1,5 @@
 #include "../firmware/Copilot/src/CharacterEffects.h"
+#include "../firmware/Copilot/generated/sprite_assets.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -38,11 +39,14 @@ static void step(CharacterMotion& motion, double dt = 1.0 / 30) {
   motion.update(dt);
   const auto after = motion.state();
   assert(after.pose.direction < 13 && after.pose.index < 24 && after.pose.blinkLevel < 5);
-  assert(std::abs(int(after.pose.index) - before.pose.index) <= 1);
+  assert(after.pose.index < kSpriteTrackSteps[after.pose.direction]);
+  const bool springHandoff = before.mode == Mode::Surprise && before.pose.direction == 8
+      && before.pose.index == 23 && after.pose.index == 0;
+  assert(springHandoff || std::abs(int(after.pose.index) - before.pose.index) <= 1);
   assert(std::abs(int(after.pose.blinkLevel) - before.pose.blinkLevel) <= 1);
   if (after.pose.direction != before.pose.direction)
-    assert(before.pose.index == 0 && after.pose.index == 0);
-  if (after.mode != before.mode) assert(before.pose.index == 0 && after.pose.index == 0);
+    assert((before.pose.index == 0 || springHandoff) && after.pose.index == 0);
+  if (after.mode != before.mode) assert((before.pose.index == 0 || springHandoff) && after.pose.index == 0);
   assert(std::isfinite(after.effectSeconds) && after.effectSeconds >= 0 && after.effectSeconds <= 12);
 }
 
@@ -63,6 +67,7 @@ static void idleParityAndCentering() {
       character.update(dt);
       sprite.update(dt);
       const auto pose = character.state().pose;
+      assert(pose.index < kSpriteTrackSteps[pose.direction]);
       assert(pose.direction == sprite.pose().direction && pose.index == sprite.pose().index
              && pose.blinkLevel == sprite.pose().blinkLevel);
     }
@@ -268,8 +273,7 @@ static void attentionAlternatesWithoutDismissing() {
   }
 }
 
-static void surpriseDoubleTake() {
-  bool firstLeft = false, firstRight = false;
+static void springSurprise() {
   for (int fps : {30, 60, 120}) {
     for (Mode resume : {Mode::Idle, Mode::Working, Mode::Attention}) {
       for (uint32_t seed = 1; seed <= 8; ++seed) {
@@ -280,68 +284,58 @@ static void surpriseDoubleTake() {
         motion.surprise();
         until(motion, [](const auto& s) { return s.mode == Mode::Surprise; }, 1.0 / fps);
         const uint32_t event = motion.state().eventId;
-        std::array<int, 2> directions{-1, -1};
-        int looks = 0, started = -1, tick = 0;
-        bool widened = false;
+        std::array<bool, 24> visited{};
+        int tick = 0;
         noAllocations = true;
         while (motion.state().mode == Mode::Surprise) {
-          assert(tick < 6 * fps);
+          assert(tick < .85 * fps);
           const auto before = motion.state();
+          visited[before.pose.index] = true;
           step(motion, 1.0 / fps);
           const auto state = motion.state();
           assert(state.eventId == event);
-          if (!widened && before.pose.direction == 8 && before.pose.index == 23) {
-            assert(tick <= (fps == 30 ? 28 : .6 * fps));
-            widened = true;
-          }
           if (state.mode == Mode::Surprise) {
             assert(state.requestedMode == Mode::Surprise && state.pose.blinkLevel == 0);
-            assert(state.pose.direction == 8 || state.pose.direction < 2);
-            if (state.pose.direction < 2) assert(state.pose.index <= 13);
-            if (state.pose.direction != before.pose.direction && state.pose.direction < 2) {
-              assert(widened && looks < 2);
-              if (started >= 0) assert(tick-started < 2 * fps);
-              directions[looks++] = state.pose.direction;
-              started = tick;
-            }
+            assert(state.pose.direction == 8 && state.pose.index >= before.pose.index);
           }
           ++tick;
         }
         noAllocations = false;
-        assert(looks == 2 && directions[0] != directions[1]);
-        assert(tick-started < 2 * fps);
+        assert(std::all_of(visited.begin(), visited.end(), [](bool value) { return value; }));
+        assert(tick >= 24);
         assert(motion.state().mode == resume && motion.state().requestedMode == resume);
-        firstLeft |= directions[0] == 1;
-        firstRight |= directions[0] == 0;
       }
     }
   }
-  assert(firstLeft && firstRight);
-  for (int direction : {0, 1}) {
-    for (int index : {1, 8, 10}) {
+    for (int index : {0, 1, 4, 8, 16, 22, 23}) {
       for (Mode next : {Mode::Idle, Mode::Surprise, Mode::Working, Mode::Complete, Mode::Attention}) {
         CharacterMotion motion(42, 13);
         motion.surprise();
         until(motion, [&](const auto& s) {
-          return s.mode == Mode::Surprise && s.pose.direction == direction && s.pose.index == index;
+          return s.mode == Mode::Surprise && s.pose.direction == 8 && s.pose.index == index;
         });
         assert(motion.setMode(next));
+        do {
+          const auto before = motion.state();
+          step(motion);
+          const auto after = motion.state();
+          if (before.pose.index != 23) assert(after.pose.index >= before.pose.index);
+        } while (motion.state().mode == Mode::Surprise && motion.state().pose.index != 0);
         until(motion, [&](const auto& s) {
           return s.mode == next && s.pose.index == 0
               && (next == Mode::Idle || s.pose.direction == 7 + unsigned(next));
         });
-      }
     }
   }
 }
 
 static void effectRestoration() {
-  constexpr size_t pixels = kFrameWidth * kCharacterFrameHeight;
+  constexpr size_t pixels = kCharacterFrameWidth * kCharacterFrameHeight;
   std::vector<uint16_t> first(pixels + 2), second(pixels + 2), baseline(pixels);
   first.front() = first.back() = second.front() = second.back() = 0xbeef;
   for (size_t i = 0; i < pixels; ++i) {
     // Artwork includes bright body pixels and a completely black facial interior.
-    const int x = i % kFrameWidth, y = i / kFrameWidth;
+    const int x = static_cast<int>(i % kCharacterFrameWidth) - kCharacterArtX, y = i / kCharacterFrameWidth;
     baseline[i] = (x > 80 && x < 320 && y > 90 && y < 330 && !(x > 160 && x < 240 && y < 220))
         ? 0xabcd : (i % 97 == 0 ? 0x1234 : 0);
   }
@@ -366,7 +360,7 @@ static void effectRestoration() {
       if (frame[i] != baseline[i]) ++damage;
     }
     assert(damage <= CharacterEffects::kDamageBudget);
-    assert(frame[176 * kFrameWidth + 200] == 0);
+    assert(frame[176 * kCharacterFrameWidth + 200 + kCharacterArtX] == 0);
     sawEffect |= damage > 0;
     assert(first.front() == 0xbeef && first.back() == 0xbeef);
     assert(second.front() == 0xbeef && second.back() == 0xbeef);
@@ -386,7 +380,7 @@ static void effectRestoration() {
   state.pose.direction = 12;
   assert(effects->render(state, first.data() + 1));
   const auto* bytes = reinterpret_cast<const uint8_t*>(first.data() + 1);
-  const size_t amber = ((44 + kFrameY) * kFrameWidth + 344) * 2;
+  const size_t amber = ((44 + kFrameY) * kCharacterFrameWidth + 344 + kCharacterArtX) * 2;
   assert(bytes[amber] == 0xc4 && bytes[amber + 1] == 0xa8);
   assert(!effects->render(state, first.data() + 1) && effects->error());
   assert(effects->restore(first.data() + 1));
@@ -408,7 +402,7 @@ static void effectRestoration() {
 
 static void benchmarkEffects() {
   constexpr int frames = 100000;
-  std::vector<uint16_t> first(kFrameWidth * kCharacterFrameHeight), second(first.size());
+  std::vector<uint16_t> first(kCharacterFrameWidth * kCharacterFrameHeight), second(first.size());
   auto effects = std::make_unique<CharacterEffects>(first.data(), second.data());
   for (Mode mode : {Mode::Surprise, Mode::Working, Mode::Complete, Mode::Attention}) {
     CharacterState state{};
@@ -438,7 +432,7 @@ int main(int argc, char**) {
   blinkSafeExpressionEntry();
   workingLooksStayBusy();
   attentionAlternatesWithoutDismissing();
-  surpriseDoubleTake();
+  springSurprise();
   effectRestoration();
   std::cout << "Character tests passed: idle parity; center-only handoffs; all modes/interruptions; "
                "pause/stalls; 960,000 allocation-free updates; dual-buffer effects/canaries/body preservation\n";

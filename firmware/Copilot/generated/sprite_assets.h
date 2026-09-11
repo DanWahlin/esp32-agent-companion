@@ -3,14 +3,20 @@
 #include <stdint.h>
 
 namespace copilot {
-constexpr int kSpriteWidth = 400;
+constexpr int kSpriteWidth = 412;
 constexpr int kSpriteHeight = 352;
+constexpr int kSpriteBaseX = 32;
+constexpr int kSpriteBaseY = 23;
+constexpr int kSpriteBaseWidth = 348;
+constexpr int kSpriteBaseHeight = 304;
 constexpr int kSpriteDirections = 13;
 constexpr int kSpriteSteps = 24;
-constexpr int kSpriteFrameCount = 312;
+constexpr int kSpriteFrameCount = 288;
 constexpr int kSpriteBlinkLevels = 5;
 constexpr int kSpriteMaxPatchPixels = 7452;
 constexpr bool kSpriteDisplayReady = true;
+constexpr uint8_t kSpriteTrackSteps[kSpriteDirections] = {24, 24, 12, 12, 24, 24, 24, 24, 24, 24, 24, 24, 24};
+constexpr uint16_t kSpriteTrackOffsets[kSpriteDirections] = {0, 24, 48, 60, 72, 96, 120, 144, 168, 192, 216, 240, 264};
 
 struct SpriteBlock {
     uint32_t offset;

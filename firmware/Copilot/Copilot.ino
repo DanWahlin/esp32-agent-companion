@@ -9,6 +9,7 @@
 #include <cstdarg>
 #include <atomic>
 #include "src/SpriteRenderer.h"
+#include "src/SpritePredictor.h"
 #include "src/SpriteStorage.h"
 #include "src/CharacterMotion.h"
 #include "src/CharacterEffects.h"
@@ -26,6 +27,9 @@ TaskHandle_t renderTask;
 SpriteRenderer* renderer;
 CharacterEffects* effects;
 tinfl_decompressor inflater;
+alignas(4) uint8_t inflateHistory[TINFL_LZ_DICT_SIZE];
+SpritePredictor spritePredictor;
+uint32_t inflateTimeUs = 0, predictTimeUs = 0;
 constexpr size_t kTransferBytes = 4096;
 uint8_t* transferBuffer;
 std::atomic<uint32_t> droppedLogs{0};
@@ -48,7 +52,7 @@ void logMessage(const char* format, ...) {
 
 struct Frame {
   uint16_t* pixels;
-  uint32_t renderUs, motionUs, decodeUs, compositeUs, eyesUs, effectsUs;
+  uint32_t renderUs, motionUs, decodeUs, compositeUs, eyesUs, effectsUs, inflateUs, predictUs;
   CharacterState state;
 };
 Frame frames[2];
@@ -66,12 +70,24 @@ void* allocate(size_t bytes, uint32_t capabilities, const char* error) {
   return result;
 }
 
-bool inflatePose(uint8_t* output, size_t outputSize, const uint8_t* input, size_t inputSize) {
+bool inflatePose(uint8_t* output, size_t outputSize, const uint8_t* input, size_t inputSize, size_t width, size_t stride) {
+  if (!spritePredictor.reset(output, outputSize, width, stride)) return false;
   tinfl_init(&inflater);
-  size_t inBytes = inputSize, outBytes = outputSize;
-  const auto status = tinfl_decompress(&inflater, input, &inBytes, output, output, &outBytes,
-      TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
-  return status == TINFL_STATUS_DONE && outBytes == outputSize && inBytes == inputSize;
+  size_t consumed = 0;
+  for (;;) {
+    size_t inBytes = inputSize - consumed, outBytes = sizeof(inflateHistory);
+    const int64_t started = esp_timer_get_time();
+    // Keep filtered history intact: inverse prediction writes only to the destination.
+    const auto status = tinfl_decompress(&inflater, input + consumed, &inBytes,
+        inflateHistory, inflateHistory, &outBytes, TINFL_FLAG_PARSE_ZLIB_HEADER);
+    const int64_t inflated = esp_timer_get_time();
+    inflateTimeUs += inflated - started;
+    consumed += inBytes;
+    if (status < TINFL_STATUS_DONE || !spritePredictor.consume(inflateHistory, outBytes)) return false;
+    predictTimeUs += esp_timer_get_time() - inflated;
+    if (status == TINFL_STATUS_DONE) return consumed == inputSize && spritePredictor.complete();
+    if (status != TINFL_STATUS_HAS_MORE_OUTPUT || outBytes != sizeof(inflateHistory)) return false;
+  }
 }
 
 void animate(void*) {
@@ -95,7 +111,8 @@ void animate(void*) {
     const int64_t restoreStart = esp_timer_get_time();
     if (!effects->restore(frame->pixels)) fatal(effects->error());
     const uint32_t restoreUs = esp_timer_get_time() - restoreStart;
-    if (!renderer->render(frame->state.pose, frame->pixels + kCharacterArtOffset)) {
+    inflateTimeUs = predictTimeUs = 0;
+    if (!renderer->render(frame->state.pose, frame->pixels)) {
       fatal(renderer->error());
     }
     const int64_t effectStart = esp_timer_get_time();
@@ -105,6 +122,8 @@ void animate(void*) {
     frame->decodeUs = renderer->decodeUs;
     frame->compositeUs = renderer->compositeUs;
     frame->eyesUs = renderer->eyesUs;
+    frame->inflateUs = inflateTimeUs;
+    frame->predictUs = predictTimeUs;
     xQueueSend(readyFrames, &frame, portMAX_DELAY);
   }
 }
@@ -138,7 +157,7 @@ bool writeCapture(const uint8_t* data, size_t bytes) {
 
 bool captureFrame(const Frame& frame) {
   captureInterrupted = true;
-  constexpr size_t bytes = kFrameWidth * kCharacterFrameHeight * 2;
+  constexpr size_t bytes = kCharacterFrameWidth * kCharacterFrameHeight * 2;
   char header[256];
   const int length = snprintf(header, sizeof(header),
       "CAPTURE_POSE direction=%u frame=%u blink=%u\n"
@@ -147,7 +166,7 @@ bool captureFrame(const Frame& frame) {
       static_cast<unsigned>(frame.state.pose.direction), static_cast<unsigned>(frame.state.pose.index),
       static_cast<unsigned>(frame.state.pose.blinkLevel), static_cast<unsigned>(frame.state.mode),
       static_cast<unsigned>(frame.state.requestedMode), frame.state.effectSeconds, frame.state.eventId,
-      kFrameWidth, kCharacterFrameHeight, static_cast<unsigned>(bytes));
+      kCharacterFrameWidth, kCharacterFrameHeight, static_cast<unsigned>(bytes));
   if (length < 0 || static_cast<size_t>(length) >= sizeof(header)) {
     logMessage("CAPTURE_ERROR header formatting failed\n");
     return false;
@@ -186,6 +205,13 @@ void queueMode(DeviceCommand command) {
   logMessage("COMMAND accepted=%s\n", commandName(command));
 }
 
+void logSdStatus(const SdSpriteStatus& status) {
+  logMessage("SD state=%s card=%s capacity_bytes=%llu cache_bytes=%u hits=%u misses=%u\n",
+             status.state, status.cardType, static_cast<unsigned long long>(status.capacityBytes),
+             status.cacheBytes, status.hits, status.misses);
+  logMessage("SD_DETAIL %s\n", status.detail);
+}
+
 void processCommand(DeviceCommand command, const Frame& frame) {
   switch (command) {
     case DeviceCommand::None: break;
@@ -202,6 +228,7 @@ void processCommand(DeviceCommand command, const Frame& frame) {
                     static_cast<unsigned>(esp_reset_reason()), modeName(frame.state.mode),
                     modeName(frame.state.requestedMode), kSpriteDataSize, worstPresentationGap,
                     droppedLogs.load(std::memory_order_relaxed));
+      logSdStatus(sdSpriteStatus());
       break;
     default: queueMode(command); break;
   }
@@ -238,17 +265,21 @@ void setup() {
   commands = xQueueCreate(8, sizeof(CharacterMode));
   if (!freeFrames || !readyFrames || !commands) fatal("Frame or command queue allocation failed.");
   for (auto& frame : frames) {
-    frame.pixels = static_cast<uint16_t*>(allocate(kFrameWidth * kCharacterFrameHeight * 2,
+    frame.pixels = static_cast<uint16_t*>(allocate(kCharacterFrameWidth * kCharacterFrameHeight * 2,
         MALLOC_CAP_SPIRAM, "Framebuffer PSRAM allocation failed."));
-    std::memset(frame.pixels, 0, kFrameWidth * kCharacterFrameHeight * 2);
+    std::memset(frame.pixels, 0, kCharacterFrameWidth * kCharacterFrameHeight * 2);
     Frame* pointer = &frame;
     xQueueSend(freeFrames, &pointer, portMAX_DELAY);
   }
   renderer = new (memory) SpriteRenderer(firstOpenPatch, secondOpenPatch, patch,
-                                        frames[0].pixels + kCharacterArtOffset,
-                                        frames[1].pixels + kCharacterArtOffset, inflatePose);
+                                        frames[0].pixels, frames[1].pixels, inflatePose,
+                                        kCharacterFrameWidth, kCharacterFrameHeight);
   void* effectMemory = allocate(sizeof(CharacterEffects), MALLOC_CAP_INTERNAL, "Effects allocation failed.");
   effects = new (effectMemory) CharacterEffects(frames[0].pixels, frames[1].pixels);
+  // Warm both frame caches before starting the presentation clock and brightness fade.
+  for (auto& frame : frames)
+    if (!renderer->render({0, 0, 0}, frame.pixels)) fatal(renderer->error());
+  initializeSdSpriteStorage();
   if (xTaskCreatePinnedToCore(animate, "copilot-render", 16384, nullptr, 1,
                               &renderTask, 0) != pdPASS) fatal("Render task creation failed.");
   logMessage("READY: %dx%d, target %d fps, sprites=%u bytes, %d poses, %d tracks\n",
@@ -266,6 +297,12 @@ void loop() {
   static CharacterMode previousMode = CharacterMode::Idle;
   Frame* frame;
   if (xQueueReceive(readyFrames, &frame, pdMS_TO_TICKS(3000)) != pdTRUE) fatal("Renderer stalled.");
+  static uint32_t sdRevision = UINT32_MAX;
+  const auto storage = sdSpriteStatus();
+  if (storage.revision != sdRevision) {
+    logSdStatus(storage);
+    sdRevision = storage.revision;
+  }
   // Pace presentation, not decoding: cached frames must not arrive earlier than newly decoded poses.
   waitUntil(nextPresentation);
   const int64_t start = esp_timer_get_time();
@@ -278,9 +315,9 @@ void loop() {
   }
   previousPresentation = start;
   display.startWrite();
-  display.writeAddrWindow(kFrameX, 0, kFrameWidth, kCharacterFrameHeight);
+  display.writeAddrWindow(kCharacterFrameX, 0, kCharacterFrameWidth, kCharacterFrameHeight);
   const auto* bytes = reinterpret_cast<const uint8_t*>(frame->pixels);
-  constexpr size_t frameBytes = kFrameWidth * kCharacterFrameHeight * 2;
+  constexpr size_t frameBytes = kCharacterFrameWidth * kCharacterFrameHeight * 2;
   for (size_t offset = 0; offset < frameBytes; offset += kTransferBytes) {
     const size_t count = std::min(kTransferBytes, frameBytes - offset);
     std::memcpy(transferBuffer, bytes + offset, count);
@@ -294,9 +331,9 @@ void loop() {
   }
   TouchTap tap;
   if (pollTouchTap(tap)) {
-    const int x = tap.x - kFrameX, y = tap.y;
-    if (x >= 0 && y >= 0 && x < kFrameWidth && y < kCharacterFrameHeight
-        && frame->pixels[y * kFrameWidth + x] != 0) {
+    const int x = tap.x - kCharacterFrameX, y = tap.y;
+    if (x >= 0 && y >= 0 && x < kCharacterFrameWidth && y < kCharacterFrameHeight
+        && frame->pixels[y * kCharacterFrameWidth + x] != 0) {
       logMessage("TOUCH x=%d y=%d\n", tap.x, tap.y);
       queueMode(DeviceCommand::Surprise);
     }
@@ -329,8 +366,9 @@ void loop() {
                     frameCount * 1000000.0 / (now - lastReport),
                     renderTotal / (1000.0 * frameCount), transferTotal / (1000.0 * frameCount),
                     maxRender / 1000.0, ESP.getFreePsram(), droppedLogs.load(std::memory_order_relaxed));
-      logMessage("STAGES motion=%uus decode=%uus composite=%uus eyes=%uus effects=%uus\n",
-                    timing.motionUs, timing.decodeUs, timing.compositeUs, timing.eyesUs, timing.effectsUs);
+      logMessage("STAGES motion=%uus decode=%uus composite=%uus eyes=%uus effects=%uus inflate=%uus predict=%uus\n",
+                    timing.motionUs, timing.decodeUs, timing.compositeUs, timing.eyesUs, timing.effectsUs,
+                    timing.inflateUs, timing.predictUs);
       logMessage("PACING min_gap_us=%u max_gap_us=%u\n",
                     minGap == UINT32_MAX ? 0 : minGap, maxGap);
       constexpr uint32_t internalCaps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;

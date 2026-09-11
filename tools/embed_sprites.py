@@ -20,6 +20,18 @@ EXPRESSION_MANIFEST = "web/generated-expressions/animation.json"
 IDLE_DIRECTIONS = ("right", "left", "up", "down", "up_right", "up_left",
                    "down_right", "down_left")
 EXPRESSION_DIRECTIONS = ("surprise", "working", "complete", "attention", "attention_alternate")
+SPRITE_STEPS = 24
+
+
+def track_layout(directions):
+    counts = [((SPRITE_STEPS - 1) // 2 + 1) if direction in ("up", "down") else SPRITE_STEPS
+              for direction in directions]
+    offsets = []
+    offset = 0
+    for count in counts:
+        offsets.append(offset)
+        offset += count
+    return counts, offsets
 
 
 def read_assets_partition(root=ROOT):
@@ -118,11 +130,11 @@ def embed(root=ROOT):
         raise ValueError(f"Sprite assets are empty or exceed the assets partition budget. {REGENERATE}")
     digest = hashlib.sha256(data).hexdigest()
     metadata = json.loads((root / "assets/sprite-firmware.json").read_text())
-    if (metadata.get("formatVersion") != 3 or metadata.get("profile") != "display-ready"
+    if (metadata.get("formatVersion") != 4 or metadata.get("profile") != "display-ready"
             or metadata.get("storage") != "flash-partition"
-            or metadata.get("encoding") != "zlib-rgb565-be"
+            or metadata.get("encoding") != "zlib-rgb565-word-up-be"
             or metadata.get("displayReady") is not True
-            or metadata.get("width") != 400 or metadata.get("height") != 352
+            or metadata.get("width") != 412 or metadata.get("height") != 352
             or metadata.get("resampling") != {
                 "algorithm": "rgb565-bilinear-5bit-v1",
                 "sourceWidth": 240, "sourceHeight": 224, "drawWidth": 396,
@@ -134,8 +146,21 @@ def embed(root=ROOT):
     directions = list(IDLE_DIRECTIONS)
     if (root / EXPRESSION_MANIFEST).exists():
         directions.extend(EXPRESSION_DIRECTIONS)
-    metadata_bytes = len(directions) * 24 * 48 + 4 + 32
-    if (metadata.get("directions") != directions or metadata.get("frameCount") != len(directions) * 24
+    bounds = metadata.get("baseBounds")
+    if (not isinstance(bounds, list) or len(bounds) != 4 or any(type(n) is not int for n in bounds)
+            or min(bounds[:2]) < 0 or min(bounds[2:]) <= 0
+            or bounds[0] + bounds[2] > metadata["width"]
+            or bounds[1] + bounds[3] > metadata["height"]):
+        raise ValueError(f"Invalid sprite base bounds. {REGENERATE}")
+    counts, offsets = track_layout(directions)
+    metadata_bytes = sum(counts) * 48 + len(directions) * 3 + 4 + 32
+    expected_frames = [(direction, step) for direction, count in zip(directions, counts)
+                       for step in range(count)]
+    actual_frames = [(frame.get("direction"), frame.get("step")) for frame in metadata.get("frames", [])]
+    if (metadata.get("directions") != directions or metadata.get("frameCount") != sum(counts)
+            or metadata.get("steps") != SPRITE_STEPS
+            or metadata.get("trackSteps") != counts or metadata.get("trackOffsets") != offsets
+            or actual_frames != expected_frames
             or metadata.get("dataSha256") != digest or metadata.get("dataBytes") != len(data)
             or metadata.get("metadataBytes") != metadata_bytes
             or metadata.get("totalAssetBytes") != len(data) + metadata_bytes):
