@@ -1,0 +1,9 @@
+build/
+.deps/
+.venv/
+__pycache__/
+.DS_Store
+.env
+.env.*
+!.env.example
+firmware/Copilot/generated/atlas_bytes.h

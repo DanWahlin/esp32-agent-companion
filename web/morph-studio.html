@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Copilot Motion Studio / Superseded Morph Prototype</title>
+  <link rel="stylesheet" href="/studio.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">◈</span> Copilot <span>Motion Studio</span></a>
+    <div class="engine"><span class="status-dot"></span> Native C++ engine <span class="separator">/</span> Local preview</div>
+  </header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">Make the movement feel human</p><h1>A little more alive.</h1></div>
+      <p class="intro-note">The same motion logic, pose atlas, and renderer as the ESP32.<br>No device flashes. No approximate JavaScript animation.</p>
+    </div>
+    <div id="error" class="error" role="alert" hidden></div>
+    <div class="workspace">
+      <section class="stage-card" aria-label="Live animation preview">
+        <div class="stage-top"><span id="mode-label" class="tag">Random looking</span><span class="resolution">466 × 466 AMOLED preview</span></div>
+        <div class="stage">
+          <div class="device"><canvas id="screen" width="466" height="466" aria-label="Copilot looking around and blinking"></canvas></div>
+        </div>
+        <div class="transport">
+          <button id="play" class="primary" type="button">Pause</button>
+          <button id="step" type="button" title="Pause and advance exactly one 30 fps frame">Step frame</button>
+          <button id="restart" type="button">Restart</button>
+          <div class="speed-control" role="group" aria-label="Playback speed">
+            <button data-speed="0.25" type="button" aria-pressed="false">¼×</button>
+            <button data-speed="0.5" type="button" aria-pressed="false">½×</button>
+            <button data-speed="1" type="button" aria-pressed="true">1×</button>
+          </div>
+        </div>
+        <div class="telemetry">
+          <div><span>Time</span><strong id="time">0.00 s</strong></div>
+          <div><span>Direction</span><strong id="direction">Center</strong></div>
+          <div><span>Pose depth</span><strong id="depth">0%</strong></div>
+          <div><span>Preview rate</span><strong id="fps">— fps</strong></div>
+        </div>
+        <div class="trace-wrap">
+          <div><span>Turn depth over time</span><span id="step-metric">Largest frame step: 0.0%</span></div>
+          <canvas id="trace" width="700" height="72" aria-label="Recent turn depth trace; a smooth curve indicates smooth return motion"></canvas>
+        </div>
+        <p class="stage-hint" id="hint">Watch the full turn, the return to center, and the next direction. Use ¼× and frame stepping to inspect transitions.</p>
+      </section>
+      <aside class="controls">
+        <section class="panel">
+          <div class="panel-title"><h2>Where should he look?</h2><span class="small-tag">Live controls</span></div>
+          <div class="compass" role="group" aria-label="Request a look direction">
+            <button data-direction="5" type="button"><span>↖</span>Up left</button>
+            <button data-direction="2" type="button"><span>↑</span>Up</button>
+            <button data-direction="4" type="button"><span>↗</span>Up right</button>
+            <button data-direction="1" type="button"><span>←</span>Left</button>
+            <button id="center" class="center" type="button"><span>·</span>Center</button>
+            <button data-direction="0" type="button"><span>→</span>Right</button>
+            <button data-direction="7" type="button"><span>↙</span>Down left</button>
+            <button data-direction="3" type="button"><span>↓</span>Down</button>
+            <button data-direction="6" type="button"><span>↘</span>Down right</button>
+          </div>
+          <p class="help">Requests finish the current gesture and pass through center. They never cut directly to another pose.</p>
+          <div class="button-row"><button id="random" type="button">Random looking</button><button id="cycle" type="button">Test all 8 directions</button></div>
+        </section>
+        <section class="panel">
+          <h2>Inspect an in-between pose</h2>
+          <p class="help">A paused inspection tool, separate from live playback.</p>
+          <label for="inspect-direction">Turn track</label>
+          <select id="inspect-direction">
+            <option value="0">Right</option><option value="1">Left</option>
+            <option value="2">Up</option><option value="3">Down</option>
+            <option value="4">Up right</option><option value="5">Up left</option>
+            <option value="6">Down right</option><option value="7">Down left</option>
+          </select>
+          <label for="inspect-depth">Turn depth <output id="inspect-depth-value">0%</output></label>
+          <input id="inspect-depth" type="range" min="0" max="1000" value="0" step="1">
+          <label for="inspect-blink">Eyes open <output id="inspect-blink-value">100%</output></label>
+          <input id="inspect-blink" type="range" min="0" max="100" value="100" step="1">
+        </section>
+        <section class="panel feedback">
+          <h2>Make feedback reproducible</h2>
+          <label for="seed">Random seed</label>
+          <div class="seed-row"><input id="seed" type="number" min="0" max="4294967295" value="20260910"><button id="replay" type="button">Replay seed</button></div>
+          <label for="notes">What should change?</label>
+          <textarea id="notes" rows="2" placeholder="e.g. At 8.4s, the right-to-center return…"></textarea>
+          <div class="button-row"><button id="snapshot" type="button">Save screenshot</button><button id="copy" type="button">Copy feedback</button></div>
+          <p id="feedback-status" class="help" role="status"></p>
+        </section>
+      </aside>
+    </div>
+    <footer>Space: play / pause <span>·</span> →: step one frame <span>·</span> Rendered locally; browser performance does not certify device frame rate.</footer>
+  </main>
+  <script src="/studio.js"></script>
+</body>
+</html>

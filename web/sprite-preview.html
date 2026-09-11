@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Copilot / Generated Sprite Study</title>
+  <link rel="stylesheet" href="/studio.css">
+  <style>
+    .filmstrip{display:flex;gap:6px;overflow:auto;margin:18px 24px;padding-bottom:9px}
+    .filmstrip button{flex:none;padding:3px;width:66px;font-size:9px}
+    .filmstrip img{width:58px;height:54px;object-fit:contain;display:block;background:#000;border-radius:5px}
+    .filmstrip button[aria-pressed=true]{border-color:#a8a5ff;background:#303750}
+    .prototype{color:#a9c7d2;background:#192c35;border:1px solid #2a4956;border-radius:9px;padding:12px 16px;font-size:12px;line-height:1.6;margin:0 0 20px}
+    .sheet-link{display:block;margin-top:14px;color:#b7bdff;font-size:12px;text-decoration:none}
+    .direction-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+    .direction-row button{padding:9px 4px}
+    .direction-center{display:grid;place-items:center;color:#8a91d5}
+    button[aria-pressed=true]{border-color:#8a91d5;background:#303750}
+    button:disabled,select:disabled{opacity:.45;cursor:not-allowed}
+    .queue-status{min-height:36px;overflow-wrap:anywhere}
+  </style>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/sprite-preview.html"><span class="brand-mark">◈</span> Copilot <span>Sprite Study</span></a>
+    <div class="engine"><span class="status-dot"></span> Azure GPT Image <span class="separator">/</span> Sprite playback</div>
+  </header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">Reference-guided sprite generation</p><h1>Eight directions to explore.</h1></div>
+      <p class="intro-note">Eight generated directions. One shared center.<br>New diagonal sprites replace the device atlas.</p>
+    </div>
+    <p class="prototype" id="asset-status">Browser-only sprite review. Every pose and eyelid level is a pre-baked image. Compare discrete playback with optional adjacent-frame crossfading; neither mode warps the head. Firmware is unchanged.</p>
+    <div id="error" class="error" role="alert" hidden></div>
+    <div class="workspace">
+      <section class="stage-card">
+        <div class="stage-top"><span id="mode" class="tag">Loading sprites</span><span class="resolution">466 × 466 preview</span></div>
+        <div class="stage"><div class="device"><canvas id="screen" width="466" height="466" aria-label="Generated Copilot sprite animation with optional crossfading"></canvas></div></div>
+        <div class="transport">
+          <button id="play" class="primary" type="button">Pause</button>
+          <button id="previous" type="button">Previous frame</button>
+          <button id="next" type="button">Next frame</button>
+          <div class="speed-control" role="group" aria-label="Playback speed">
+            <button data-speed="0.25" aria-pressed="false" type="button">¼×</button>
+            <button data-speed="0.5" aria-pressed="false" type="button">½×</button>
+            <button data-speed="1" aria-pressed="true" type="button">1×</button>
+          </div>
+        </div>
+        <div class="telemetry">
+          <div><span>Sprite</span><strong id="frame">—</strong></div>
+          <div><span>Movement</span><strong id="movement">—</strong></div>
+          <div><span>Eyes / crossfade</span><strong id="eyes">Open / off</strong></div>
+          <div><span>Artwork source</span><strong id="source">—</strong></div>
+        </div>
+        <div id="filmstrip" class="filmstrip" aria-label="Select a sprite frame"></div>
+        <p class="stage-hint">Sprites are uniformly scaled, never warped. Optional crossfading blends only neighboring poses on the current track. Returns retrace the same poses; direction changes happen only at the identical center frame. Blinking continues independently during movement.</p>
+      </section>
+      <aside class="controls">
+        <section class="panel">
+          <h2>Look around</h2>
+          <div class="direction-row" role="group" aria-label="Queue a direction">
+            <button type="button" data-direction="up_left">↖ Up-left</button>
+            <button type="button" data-direction="up">Up ↑</button>
+            <button type="button" data-direction="up_right">Up-right ↗</button>
+            <button type="button" data-direction="left">← Left</button>
+            <span class="direction-center" aria-hidden="true">·</span>
+            <button type="button" data-direction="right">Right →</button>
+            <button type="button" data-direction="down_left">↙ Down-left</button>
+            <button type="button" data-direction="down">Down ↓</button>
+            <button type="button" data-direction="down_right">Down-right ↘</button>
+          </div>
+          <label><input id="auto" type="checkbox" checked> Random look-around</label>
+          <button id="cycle" type="button" aria-pressed="false">Review all directions</button>
+          <p id="queue-status" class="help queue-status" role="status">Commands wait for the shared center.</p>
+          <label for="track">Queue sprite track (while paused)</label>
+          <select id="track" disabled>
+            <option value="">Choose next track…</option>
+            <option value="right">Right</option><option value="left">Left</option>
+            <option value="up">Up</option><option value="down">Down</option>
+            <option value="up_left">Up-left</option><option value="up_right">Up-right</option>
+            <option value="down_left">Down-left</option><option value="down_right">Down-right</option>
+          </select>
+          <p class="help">Direction controls queue live turns, even while paused. Review cycles through all eight directions; queued commands run first. Straight up/down stays at 50%. Left/right and the four generated diagonals use their full sequences. All images remain available for inspection.</p>
+          <label><input id="blinks" type="checkbox" checked> Natural blinking</label>
+          <button id="blink" type="button">Blink</button>
+          <p class="help">All eight directions use localized, pre-baked eyelid masks without redrawing the head. While paused, Blink queues for Play; disabling blinks finishes reopening.</p>
+        </section>
+        <section class="panel">
+          <h2>Turn and return</h2>
+          <label for="scrub">Inspect frame <output id="scrub-value">1</output></label>
+          <input id="scrub" type="range" min="0" max="23" value="0" step="1">
+          <label for="duration">Seconds per full-range turn <output id="duration-value">1.8 s</output></label>
+          <input id="duration" type="range" min="0.8" max="4" value="1.8" step="0.1">
+          <label><input id="ease" type="checkbox" checked> Eased timing</label>
+          <label><input id="crossfade" type="checkbox"> Crossfade between frames</label>
+          <p class="help">Off by default. Toggle during playback to compare without restarting. Blending may soften stepping but can create ghosted edges; this is not shape morphing. Pause freezes the blend, while frame inspection shows the exact unblended sprite.</p>
+          <p class="help">Quintic timing eases each turn. Shorter looks finish sooner instead of lingering on fewer poses. Fractional frame time is preserved for even pacing; slow displays extend a turn instead of skipping sprites. Inspection pauses and selects a pose explicitly; Play retraces that pose to center without resetting it.</p>
+          <a id="sheet" class="sheet-link" href="/generated-sprites/right-turn-sheet.png" target="_blank" rel="noopener">Open this track’s sprite sheet ↗</a>
+        </section>
+        <section class="panel feedback">
+          <h2>Feedback on this approach</h2>
+          <label for="notes">What looks right or wrong?</label>
+          <textarea id="notes" rows="4" placeholder="e.g. Frames 9–12 change the goggle shape…"></textarea>
+          <div class="button-row"><button id="snapshot" type="button">Save frame</button><button id="copy" type="button">Copy feedback</button></div>
+          <p id="feedback-status" class="help" role="status"></p>
+        </section>
+        <section class="panel">
+          <h2>What this prototype proves</h2>
+          <p class="help">Compare eight GPT Image-generated 24-frame tracks and five eyelid levels. The rejected firmware-atlas diagonals are no longer used. Generated pose spacing and identity still need visual review. Reduced-motion preferences start paused; hiding the page pauses until Play.</p>
+        </section>
+      </aside>
+    </div>
+  </main>
+  <script src="/sprite-motion.js"></script>
+  <script src="/sprite-preview.js"></script>
+</body>
+</html>

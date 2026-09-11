@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+"""Local interactive UI backed by the exact native firmware motion/renderer."""
+import argparse
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+import json
+import math
+import os
+import re
+from pathlib import Path
+import select
+import subprocess
+import threading
+import time
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def build_renderer():
+    subprocess.run(["python3", str(ROOT / "tools/embed_atlas.py")], check=True)
+    sources = ROOT / "firmware/Copilot/src"
+    executable = ROOT / "build/live-preview"
+    subprocess.run([
+        "clang++", "-std=c++17", "-O3", "-Wall", "-Wextra", "-Werror",
+        str(ROOT / "tools/live_preview.cpp"), str(sources / "AtlasRenderer.cpp"),
+        str(sources / "Motion.cpp"), str(sources / "turn_atlas.cpp"),
+        str(ROOT / "build/atlas_host.S"), "-lz", "-o", str(executable),
+    ], check=True)
+    return executable
+
+
+class NativeRenderer:
+    def __init__(self, executable):
+        self.process = subprocess.Popen(
+            [str(executable)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0)
+        self.lock = threading.Lock()
+
+    def read(self, count, deadline):
+        result = bytearray()
+        fd = self.process.stdout.fileno()
+        while len(result) < count:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not select.select([fd], [], [], remaining)[0]:
+                raise TimeoutError("Native renderer did not respond within five seconds.")
+            chunk = os.read(fd, count - len(result))
+            if not chunk:
+                raise RuntimeError("Native renderer exited unexpectedly.")
+            result.extend(chunk)
+        return bytes(result)
+
+    def frame(self, payload):
+        if not isinstance(payload, dict):
+            raise ValueError("Request must be a JSON object.")
+        time_value = payload.get("time", 0)
+        command = payload.get("command", 0)
+        direction = payload.get("direction", 0)
+        turn = payload.get("turn", 0)
+        openness = payload.get("openness", 1)
+        seed = payload.get("seed", 20260910)
+        for name, value in (("time", time_value), ("turn", turn), ("openness", openness)):
+            if not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError(f"{name} must be a finite number.")
+        if not 0 <= time_value <= 86400 or not 0 <= turn <= 1 or not 0 <= openness <= 1:
+            raise ValueError("Time or pose parameter is out of range.")
+        if type(command) is not int or not 0 <= command <= 4:
+            raise ValueError("Unknown command.")
+        if type(direction) is not int or not 0 <= direction < 8:
+            raise ValueError("Direction must be between 0 and 7.")
+        if type(seed) is not int or not 0 <= seed <= 4294967295:
+            raise ValueError("Seed must be an unsigned 32-bit integer.")
+        request = f"{time_value:.9f} {command} {direction} {turn:.9f} {openness:.9f} {seed}\n"
+        with self.lock:
+            if self.process.poll() is not None:
+                raise RuntimeError("Native renderer is no longer running.")
+            self.process.stdin.write(request.encode("ascii"))
+            deadline = time.monotonic() + 5
+            header = bytearray()
+            while not header.endswith(b"\n") and len(header) < 1024:
+                header.extend(self.read(1, deadline))
+            fields = header.decode("ascii").strip().split()
+            if len(fields) != 7 or fields[0] != "OK" or int(fields[1]) != 281600:
+                raise RuntimeError(f"Native render failed: {header.decode('ascii').strip()}")
+            pixels = self.read(int(fields[1]), deadline)
+            return pixels, dict(direction=fields[2], turn=fields[3], openness=fields[4],
+                                renderMs=fields[5], automatic=fields[6])
+
+    def close(self):
+        with self.lock:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait()
+            finally:
+                self.process.stdin.close()
+                self.process.stdout.close()
+
+
+class RendererSessions:
+    def __init__(self, executable):
+        self.executable = executable
+        self.instances = {}
+        self.lock = threading.Lock()
+
+    def get(self, session):
+        if not isinstance(session, str) or not re.fullmatch(r"[a-zA-Z0-9-]{1,64}", session):
+            raise ValueError("A valid browser session is required.")
+        with self.lock:
+            if session not in self.instances:
+                if len(self.instances) >= 8:
+                    raise RuntimeError("Eight previews are already open. Close an unused preview first.")
+                self.instances[session] = NativeRenderer(self.executable)
+            return self.instances[session]
+
+    def close(self, session):
+        with self.lock:
+            instance = self.instances.pop(session, None)
+        if instance:
+            instance.close()
+
+    def close_all(self):
+        for session in list(self.instances):
+            self.close(session)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=8765)
+    args = parser.parse_args()
+    sessions = RendererSessions(build_renderer())
+
+    class Handler(SimpleHTTPRequestHandler):
+        def __init__(self, *arguments, **keywords):
+            super().__init__(*arguments, directory=str(ROOT / "web"), **keywords)
+
+        def log_message(self, format_string, *arguments):
+            if self.command != "POST" or len(arguments) < 2 or str(arguments[1]) != "200":
+                super().log_message(format_string, *arguments)
+
+        def do_POST(self):
+            if self.path not in ("/api/frame", "/api/close"):
+                self.send_error(404)
+                return
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                if size <= 0 or size > 4096:
+                    raise ValueError("Invalid request size.")
+                payload = json.loads(self.rfile.read(size))
+                if not isinstance(payload, dict):
+                    raise ValueError("Request must be a JSON object.")
+                if self.path == "/api/close":
+                    session = payload.get("session")
+                    if not isinstance(session, str):
+                        raise ValueError("Browser session is required.")
+                    sessions.close(session)
+                    self.send_response(204)
+                    self.end_headers()
+                    return
+                pixels, metadata = sessions.get(payload.get("session")).frame(payload)
+            except (ValueError, json.JSONDecodeError) as error:
+                self.send_error(400, str(error))
+                return
+            except (RuntimeError, TimeoutError, BrokenPipeError) as error:
+                self.send_error(503, str(error))
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(pixels)))
+            self.send_header("Cache-Control", "no-store")
+            for key, value in metadata.items():
+                self.send_header(f"X-Copilot-{key}", value)
+            self.end_headers()
+            self.wfile.write(pixels)
+
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+        print(f"Copilot Motion Studio: http://127.0.0.1:{args.port}", flush=True)
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        sessions.close_all()
+
+
+if __name__ == "__main__":
+    main()

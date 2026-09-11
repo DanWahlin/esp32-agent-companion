@@ -1,0 +1,254 @@
+{
+  "title": "GPT Image left-turn sprite study",
+  "provider": "Azure GPT Image",
+  "source": "left-turn-sheet.png",
+  "width": 240,
+  "height": 224,
+  "count": 24,
+  "frames": [
+    {
+      "file": "left-00.png",
+      "sourceBounds": [
+        66,
+        54,
+        263,
+        214
+      ],
+      "uniformScale": 1.0
+    },
+    {
+      "file": "left-01.png",
+      "sourceBounds": [
+        311,
+        54,
+        511,
+        214
+      ],
+      "uniformScale": 1.0
+    },
+    {
+      "file": "left-02.png",
+      "sourceBounds": [
+        561,
+        53,
+        756,
+        214
+      ],
+      "uniformScale": 0.9939393939393939
+    },
+    {
+      "file": "left-03.png",
+      "sourceBounds": [
+        809,
+        53,
+        1001,
+        214
+      ],
+      "uniformScale": 0.9939393939393939
+    },
+    {
+      "file": "left-04.png",
+      "sourceBounds": [
+        1055,
+        53,
+        1245,
+        214
+      ],
+      "uniformScale": 0.9939393939393939
+    },
+    {
+      "file": "left-05.png",
+      "sourceBounds": [
+        1302,
+        53,
+        1484,
+        214
+      ],
+      "uniformScale": 0.9939393939393939
+    },
+    {
+      "file": "left-06.png",
+      "sourceBounds": [
+        85,
+        286,
+        252,
+        446
+      ],
+      "uniformScale": 1.0
+    },
+    {
+      "file": "left-07.png",
+      "sourceBounds": [
+        335,
+        286,
+        495,
+        446
+      ],
+      "uniformScale": 1.0
+    },
+    {
+      "file": "left-08.png",
+      "sourceBounds": [
+        584,
+        286,
+        735,
+        446
+      ],
+      "uniformScale": 1.0
+    },
+    {
+      "file": "left-09.png",
+      "sourceBounds": [
+        829,
+        287,
+        974,
+        445
+      ],
+      "uniformScale": 1.0123456790123457
+    },
+    {
+      "file": "left-10.png",
+      "sourceBounds": [
+        1074,
+        287,
+        1216,
+        445
+      ],
+      "uniformScale": 1.0123456790123457
+    },
+    {
+      "file": "left-11.png",
+      "sourceBounds": [
+        1319,
+        288,
+        1456,
+        445
+      ],
+      "uniformScale": 1.0186335403726707
+    },
+    {
+      "file": "left-12.png",
+      "sourceBounds": [
+        97,
+        524,
+        234,
+        680
+      ],
+      "uniformScale": 1.025
+    },
+    {
+      "file": "left-13.png",
+      "sourceBounds": [
+        344,
+        525,
+        478,
+        679
+      ],
+      "uniformScale": 1.0379746835443038
+    },
+    {
+      "file": "left-14.png",
+      "sourceBounds": [
+        591,
+        525,
+        721,
+        679
+      ],
+      "uniformScale": 1.0379746835443038
+    },
+    {
+      "file": "left-15.png",
+      "sourceBounds": [
+        835,
+        526,
+        965,
+        678
+      ],
+      "uniformScale": 1.0512820512820513
+    },
+    {
+      "file": "left-16.png",
+      "sourceBounds": [
+        1078,
+        526,
+        1209,
+        677
+      ],
+      "uniformScale": 1.0580645161290323
+    },
+    {
+      "file": "left-17.png",
+      "sourceBounds": [
+        1320,
+        526,
+        1450,
+        677
+      ],
+      "uniformScale": 1.0580645161290323
+    },
+    {
+      "file": "left-18.png",
+      "sourceBounds": [
+        96,
+        761,
+        229,
+        912
+      ],
+      "uniformScale": 1.0580645161290323
+    },
+    {
+      "file": "left-19.png",
+      "sourceBounds": [
+        342,
+        761,
+        475,
+        912
+      ],
+      "uniformScale": 1.0580645161290323
+    },
+    {
+      "file": "left-20.png",
+      "sourceBounds": [
+        586,
+        761,
+        719,
+        912
+      ],
+      "uniformScale": 1.0580645161290323
+    },
+    {
+      "file": "left-21.png",
+      "sourceBounds": [
+        830,
+        761,
+        964,
+        912
+      ],
+      "uniformScale": 1.0580645161290323
+    },
+    {
+      "file": "left-22.png",
+      "sourceBounds": [
+        1073,
+        761,
+        1207,
+        911
+      ],
+      "uniformScale": 1.0649350649350648
+    },
+    {
+      "file": "left-23.png",
+      "sourceBounds": [
+        1314,
+        761,
+        1450,
+        912
+      ],
+      "uniformScale": 1.0580645161290323
+    }
+  ],
+  "sheet": "left-turn-sheet.png",
+  "playback": "Discrete frames only. Reverse reuses the identical frames in reverse order.",
+  "processing": "Translation and uniform-scale registration only. No shape warping, morphing, or crossfades.",
+  "status": "Generated prototype; visual and temporal consistency require review."
+}

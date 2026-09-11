@@ -1,0 +1,17 @@
+Generate a precise production animation sprite sheet of the blue/violet GitHub Copilot head in image 1. Image 2 is a layout guide: preserve its exact 6-column by 4-row arrangement, centers, cell spacing and angle labels, replacing each crosshair with the same Copilot head at that cell's stated yaw angle.
+
+Output 1536 x 1024 pixels, high-quality PNG style, solid black background, professional technical-animation reference sheet. Exact top label 'RIGHT TURN'. Ensure all text is spelled correctly and fully visible with proper margins. Keep the small numeric angle labels below the sprite art, never on the character. No added decorations, bodies, hands, floor, or external cast shadows.
+
+Critical goal: this is ONE rigid 3D character turning very gradually to the viewer's right, not a set of different illustrations. All 24 frames must have exactly the SAME apparent head height of 154 pixels and the SAME camera scale and fixed studio lighting. In all frames the central helmet body keeps its exact proportions. Keep the head rotation pivot centered on each guide crosshair. The goggles must remain rigidly attached, with the same frame thickness and lens shape. All anatomical distances stay fixed; only physical perspective changes.
+
+The exact yaw angles in reading order are:
+row 1: 0, 3, 6, 9, 12, 15 degrees.
+row 2: 18, 21, 24, 27, 30, 33 degrees.
+row 3: 36, 39, 42, 45, 48, 51 degrees.
+row 4: 54, 57, 60, 63, 66, 69 degrees.
+
+The first six frames should all be near-frontal with VERY subtle successive rotation. Do not jump to the three-quarter view in frame 3. No duplicate poses. No backwards angle changes. Do not restart the rotation at row boundaries. Frames 7 through 18 continue gradual rotation. Only the final frames approach a side profile.
+
+Faithfully reproduce the reference: lavender-purple smooth helmet dome; cobalt and cyan thick, rounded-square goggles perched above the face, with dark saturated blue recessed lenses; separate curved dark-blue face visor below the goggles; pale lavender visor rim; two slender upright cyan illuminated eyes in the LOWER FACE VISOR, not the goggles; smooth rounded violet/blue ear pods. Eyes remain open and only disappear gradually when physically occluded at large yaw angles. No mouth, nose, eyebrows, or new features.
+
+Retain glossy, clean gradient 3D-rendered surfaces without grain or stippling. No transparency, image blending, double outlines, melting, warping, squash/stretch, head shrinking, camera zoom, changing goggle style, or arbitrary changes in illumination. Make the images read as 24 successive renders of one identical rigid model. Remove the gray crosshairs and cell outlines from the guide while retaining the clean spacing and angle labels.

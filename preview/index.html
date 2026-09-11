@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Copilot / AMOLED</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #08090d; color: #f0f3fa; }
+    * { box-sizing: border-box; }
+    body { min-height: 100svh; margin: 0; display: grid; place-items: center; padding: 36px 20px; }
+    main { text-align: center; width: min(100%, 680px); }
+    .eyebrow { color: #8c91a4; font-size: 11px; font-weight: 600; letter-spacing: .23em; text-transform: uppercase; }
+    h1 { font-size: clamp(28px, 5vw, 42px); letter-spacing: -.05em; margin: 12px 0 38px; font-weight: 500; }
+    .device { width: min(466px, 85vw); aspect-ratio: 1; margin: auto; border-radius: 50%; background: #000;
+      box-shadow: 0 0 0 2px #252633, 0 0 0 12px #111218, 0 0 0 13px #24252d, 0 25px 90px #000; overflow: hidden; }
+    img { display: block; width: 100%; height: 100%; }
+    .caption { color: #8c91a4; font-size: 13px; line-height: 1.8; margin: 40px 0 20px; }
+    button { background: #191b26; border: 1px solid #36394c; color: #e7e9f4; border-radius: 100px; padding: 10px 20px; cursor: pointer; }
+    button:hover { background: #282b3b; }
+    button:focus-visible { outline: 2px solid #a3b4ff; outline-offset: 4px; }
+    footer { color: #626779; font-size: 11px; margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Waveshare / ESP32-S3 / AMOLED</div>
+    <h1>A little more alive.</h1>
+    <div class="device"><img id="copilot" src="still.png" alt="Blue and violet Copilot gently looking around and blinking"></div>
+    <p class="caption">Deep turns. Curious glances. The occasional blink.<br>Rendered by the same C++ engine that runs on the board.</p>
+    <button id="toggle" type="button" aria-pressed="false">Play animation</button>
+    <footer>466 &times; 466 &middot; 18-second seeded preview &middot; device motion is randomized</footer>
+  </main>
+  <script>
+    const image = document.querySelector('#copilot');
+    const button = document.querySelector('#toggle');
+    let playing = false;
+    function setPlaying(value) {
+      playing = value;
+      image.src = playing ? 'animation.webp' : 'still.png';
+      button.textContent = playing ? 'Pause animation' : 'Play animation';
+      button.setAttribute('aria-pressed', String(playing));
+    }
+    button.addEventListener('click', () => setPlaying(!playing));
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setPlaying(true);
+  </script>
+</body>
+</html>
