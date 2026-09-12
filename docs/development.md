@@ -151,6 +151,27 @@ reaction modes passed. These measurements do not yet exercise SD cache hits.
 
 ## Preview and development
 
+### Copilot CLI companion daemon
+
+`daemon/` contains the TypeScript listener used by local Copilot CLI sessions.
+Copilot hooks send lifecycle JSON over a user-private Unix socket; the daemon
+aggregates concurrent sessions and subagents, then writes bounded mode commands
+through the first `/dev/cu.usbmodem*` device without toggling DTR/RTS or HUPCL.
+
+```bash
+cd daemon
+npm install
+npm test
+npm run install:macos
+npm run status
+```
+
+The installer writes `~/.copilot/hooks/agent-companion.json` and a
+`launchd` user agent. Hook failures are intentionally ignored so a missing daemon
+or disconnected device never blocks Copilot. Restart Copilot CLI after changing
+hook configuration. The daemon only transmits lifecycle state and session IDs;
+it does not send prompts, responses, source code, or tool arguments to the ESP32.
+
 ### Character Lab
 
 Run `python3 tools/serve_preview.py`, then open **http://127.0.0.1:8765**.

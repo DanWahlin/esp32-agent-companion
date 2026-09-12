@@ -1,4 +1,6 @@
 build/
+daemon/dist/
+daemon/node_modules/
 .deps/
 .venv/
 __pycache__/

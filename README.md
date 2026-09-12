@@ -27,8 +27,27 @@ built-in character.
   flash assets as the fallback.
 
 The character works immediately in automatic Idle mode. Agent states can be
-controlled through USB serial commands or the swipe-up settings menu. **Automatic
-integration with coding agents and additional characters are not implemented yet**.
+controlled through USB serial commands, the swipe-up settings menu, or the
+included Copilot CLI daemon. **Additional characters and wireless daemon
+transports are not implemented yet**.
+
+### Copilot CLI companion daemon
+
+The initial macOS integration uses a local TypeScript daemon and Copilot CLI
+lifecycle hooks. It automatically prefers the existing non-resetting USB command
+protocol; Wi-Fi and Bluetooth transports are planned behind the same interface.
+
+```bash
+cd daemon
+npm install
+npm test
+npm run install:macos
+```
+
+Restart Copilot CLI after installation so it loads the user-level hooks. The
+daemon maps active main-agent or subagent work to Working, permission and
+elicitation prompts to Needs attention, verified tool-using turns to Complete,
+and inactive sessions to Idle.
 
 <p align="center">
   <img src="preview/agent-companion-demo.gif" alt="ESP32 Agent Companion cycling through Idle, Surprise, Working, Needs attention, and Complete states" width="400">
