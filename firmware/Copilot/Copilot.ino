@@ -41,6 +41,7 @@ bool captureInterrupted = false;
 SettingsMenu settings(kBrightness);
 constexpr char kPreferencesNamespace[] = "agent-companion";
 constexpr char kSoundPreference[] = "sound";
+constexpr char kSoundVolumePreference[] = "volume";
 
 struct ModeRequest {
   CharacterMode mode = CharacterMode::Idle;
@@ -229,29 +230,36 @@ void queueTouchSurprise() {
   logMessage("COMMAND accepted=surprise source=touch return=idle\n");
 }
 
-SoundLevel loadSoundLevel() {
+uint8_t loadSoundVolume() {
   Preferences preferences;
-  if (!preferences.begin(kPreferencesNamespace, true)) {
+  if (!preferences.begin(kPreferencesNamespace, false)) {
     logMessage("SETTINGS_ERROR sound preference open failed\n");
-    return SoundLevel::Quiet;
+    return kDefaultSoundVolume;
   }
-  const uint8_t stored =
-      preferences.getUChar(kSoundPreference, static_cast<uint8_t>(SoundLevel::Quiet));
+  uint8_t stored;
+  if (preferences.isKey(kSoundVolumePreference)) {
+    stored = preferences.getUChar(kSoundVolumePreference, kDefaultSoundVolume);
+  } else {
+    const uint8_t legacy = preferences.getUChar(kSoundPreference, 1);
+    stored = legacy == 0 ? 0 : legacy == 2 ? 100 : kDefaultSoundVolume;
+    if (preferences.putUChar(kSoundVolumePreference, stored) != 1)
+      logMessage("SETTINGS_ERROR sound preference migration failed\n");
+  }
   preferences.end();
-  if (!isValidSoundLevel(stored)) {
-    logMessage("SETTINGS_ERROR invalid sound level=%u\n", static_cast<unsigned>(stored));
-    return SoundLevel::Quiet;
+  if (stored > 100) {
+    logMessage("SETTINGS_ERROR invalid sound volume=%u\n", static_cast<unsigned>(stored));
+    return kDefaultSoundVolume;
   }
-  return static_cast<SoundLevel>(stored);
+  return stored;
 }
 
-void saveSoundLevel(SoundLevel level) {
+void saveSoundVolume(uint8_t volume) {
   Preferences preferences;
   if (!preferences.begin(kPreferencesNamespace, false)) {
     logMessage("SETTINGS_ERROR sound preference open failed\n");
     return;
   }
-  if (preferences.putUChar(kSoundPreference, static_cast<uint8_t>(level)) != 1)
+  if (preferences.putUChar(kSoundVolumePreference, volume) != 1)
     logMessage("SETTINGS_ERROR sound preference write failed\n");
   preferences.end();
 }
@@ -320,12 +328,21 @@ void drawSettingsMenu(CharacterMode selected) {
   display.setTextSize(1);
   display.setCursor(218, 151);
   display.print("Sound");
-  drawSettingsButton(86, 162, 90, "Off", settings.soundLevel() == SoundLevel::Off,
-                     2, 38);
-  drawSettingsButton(184, 162, 98, "Quiet",
-                     settings.soundLevel() == SoundLevel::Quiet, 2, 38);
-  drawSettingsButton(290, 162, 90, "Normal",
-                     settings.soundLevel() == SoundLevel::Normal, 2, 38);
+  drawSettingsButton(150, 162, 48, "-", false, 3, 38);
+  drawSettingsButton(268, 162, 48, "+", false, 3, 38);
+  display.fillRoundRect(204, 162, 58, 38, 10, background);
+  display.setTextColor(text);
+  display.setTextSize(2);
+  char volume[8];
+  if (settings.soundVolume() == 0) {
+    snprintf(volume, sizeof(volume), "Off");
+    display.setCursor(215, 173);
+  } else {
+    snprintf(volume, sizeof(volume), "%u%%",
+             static_cast<unsigned>(settings.soundVolume()));
+    display.setCursor(211, 173);
+  }
+  display.print(volume);
   display.setTextColor(text);
   display.setTextSize(2);
   display.setCursor(58, 207);
@@ -379,15 +396,14 @@ void handleTouchGesture(const TouchGesture& gesture, const Frame& frame) {
       drawSettingsMenu(frame.state.requestedMode);
       logMessage("SETTINGS brightness=%u\n", static_cast<unsigned>(settings.brightness()));
       break;
-    case SettingsAction::SoundOff:
-    case SettingsAction::SoundQuiet:
-    case SettingsAction::SoundNormal:
-      setSoundLevel(settings.soundLevel());
-      saveSoundLevel(settings.soundLevel());
+    case SettingsAction::SoundDown:
+    case SettingsAction::SoundUp:
+      setSoundVolume(settings.soundVolume());
+      saveSoundVolume(settings.soundVolume());
       queueAudioCue(AudioCue::Settings);
       drawSettingsMenu(frame.state.requestedMode);
-      logMessage("SETTINGS sound=%u\n",
-                 static_cast<unsigned>(settings.soundLevel()));
+      logMessage("SETTINGS sound_volume=%u\n",
+                 static_cast<unsigned>(settings.soundVolume()));
       break;
     case SettingsAction::Idle:
       settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Idle); break;
@@ -427,12 +443,12 @@ void processCommand(DeviceCommand command, const Frame& frame) {
       break;
     case DeviceCommand::Info:
       logMessage("INFO protocol=%u uptime_ms=%llu reset_reason=%u mode=%s requested=%s assets=%u "
-                 "max_gap_us=%u dropped_logs=%u audio_ready=%u sound=%u\n",
+                 "max_gap_us=%u dropped_logs=%u audio_ready=%u sound_volume=%u\n",
                     kDeviceProtocol, static_cast<unsigned long long>(esp_timer_get_time() / 1000),
                     static_cast<unsigned>(esp_reset_reason()), modeName(frame.state.mode),
                     modeName(frame.state.requestedMode), kSpriteDataSize, worstPresentationGap,
                     droppedLogs.load(std::memory_order_relaxed), static_cast<unsigned>(audioReady()),
-                    static_cast<unsigned>(soundLevel()));
+                    static_cast<unsigned>(soundVolume()));
       logSdStatus(sdSpriteStatus());
       break;
     default: queueMode(command); break;
@@ -454,9 +470,9 @@ void setup() {
   display.fillScreen(0);
   if (!initializeSpriteStorage()) fatal(spriteStorageError());
   if (!initializeTouchInput()) fatal(touchInputError());
-  const SoundLevel storedSoundLevel = loadSoundLevel();
-  settings.setSoundLevel(storedSoundLevel);
-  setSoundLevel(storedSoundLevel);
+  const uint8_t storedSoundVolume = loadSoundVolume();
+  settings.setSoundVolume(storedSoundVolume);
+  setSoundVolume(storedSoundVolume);
   beginAudio();
   transferBuffer = static_cast<uint8_t*>(heap_caps_aligned_alloc(
       16, kTransferBytes, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));

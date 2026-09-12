@@ -215,9 +215,9 @@ On the physical device, a tap is recognized only after release so a swipe cannot
 trigger Surprise first. A tapped Surprise returns to Idle after the spring,
 regardless of the previous persistent state. Explicit Surprise signals retain
 their existing resume behavior. Swipe up opens the settings menu for brightness,
-Off/Quiet/Normal sound, and character-state selection; swipe down or tap Close
-to dismiss it. Sound defaults to Quiet and is persisted in internal NVS, never
-on the microSD card.
+0-100% sound volume, and character-state selection; swipe down or tap Close to
+dismiss it. Sound defaults to 50% and is persisted in internal NVS, never on the
+microSD card.
 All four mode links are also prominently available on `/sprite-preview.html`.
 Transitions use shared-center artwork before switching tracks. The spring
 reaction settles forward to its neutral final frame rather than reversing the impact.

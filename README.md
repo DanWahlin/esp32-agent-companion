@@ -130,9 +130,9 @@ whole-chip erase or modify your microSD card.
 
 When flashing finishes, the device restarts and the character begins looking
 around. Tap it to try the touch reaction; it returns to Idle when the spring
-finishes. Swipe up to open settings. The menu adjusts display brightness, selects
-Off, Quiet, or Normal sound, and chooses Idle, Surprise, Working, Complete, or
-Needs attention. Quiet is the default and the sound choice persists across
+finishes. Swipe up to open settings. The menu adjusts display brightness and
+sound volume from Off through 100%, and chooses Idle, Surprise, Working, Complete,
+or Needs attention. The 50% default and subsequent volume changes persist across
 restarts. Swipe down or tap Close to return to the character.
 
 Sound uses the board's ES8311 codec and two-pin speaker output. Connect a compatible

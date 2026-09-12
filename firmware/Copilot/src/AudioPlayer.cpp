@@ -18,7 +18,7 @@ struct AudioAsset {
 I2SClass i2s;
 QueueHandle_t cueQueue = nullptr;
 es8311_handle_t codec = nullptr;
-std::atomic<uint8_t> currentLevel{static_cast<uint8_t>(SoundLevel::Quiet)};
+std::atomic<uint8_t> currentVolume{kDefaultSoundVolume};
 std::atomic<bool> ready{false};
 
 AudioAsset assetForCue(AudioCue cue) {
@@ -37,8 +37,9 @@ AudioAsset assetForCue(AudioCue cue) {
   return {nullptr, 0};
 }
 
-int volumeForLevel(SoundLevel level) {
-  return level == SoundLevel::Normal ? kAudioNormalVolume : kAudioQuietVolume;
+int codecVolume(uint8_t volume) {
+  return kAudioMinimumCodecVolume +
+         (volume * (kAudioMaximumCodecVolume - kAudioMinimumCodecVolume) + 50) / 100;
 }
 
 bool writeAll(const uint8_t* data, size_t size) {
@@ -52,12 +53,12 @@ bool writeAll(const uint8_t* data, size_t size) {
 }
 
 bool playCue(AudioCue cue, AudioCue& replacement) {
-  const SoundLevel level = soundLevel();
-  if (level == SoundLevel::Off) return true;
+  const uint8_t volume = soundVolume();
+  if (volume == 0) return true;
   const AudioAsset asset = assetForCue(cue);
   if (!asset.samples || asset.count == 0) return true;
 
-  if (es8311_voice_volume_set(codec, volumeForLevel(level), nullptr) != ESP_OK) {
+  if (es8311_voice_volume_set(codec, codecVolume(volume), nullptr) != ESP_OK) {
     Serial.println("AUDIO error=codec-output");
     return true;
   }
@@ -73,7 +74,7 @@ bool playCue(AudioCue cue, AudioCue& replacement) {
   static int16_t stereo[kChunkFrames * 2];
   bool interrupted = false;
   for (uint32_t offset = 0; offset < asset.count; offset += kChunkFrames) {
-    if (soundLevel() == SoundLevel::Off) break;
+    if (soundVolume() == 0) break;
     if (xQueueReceive(cueQueue, &replacement, 0) == pdTRUE) {
       interrupted = true;
       break;
@@ -130,8 +131,8 @@ void audioTask(void*) {
     vTaskDelete(nullptr);
     return;
   }
-  Serial.printf("AUDIO ready sample_rate=%u level=%u\n", kAudioSampleRate,
-                static_cast<unsigned>(currentLevel.load()));
+  Serial.printf("AUDIO ready sample_rate=%u volume=%u\n", kAudioSampleRate,
+                static_cast<unsigned>(currentVolume.load()));
   ready.store(true);
 
   AudioCue cue;
@@ -164,17 +165,17 @@ bool audioReady() {
   return ready.load();
 }
 
-void setSoundLevel(SoundLevel level) {
-  currentLevel.store(static_cast<uint8_t>(level));
-  if (level == SoundLevel::Off && cueQueue) xQueueReset(cueQueue);
+void setSoundVolume(uint8_t volume) {
+  currentVolume.store(volume > 100 ? 100 : volume);
+  if (volume == 0 && cueQueue) xQueueReset(cueQueue);
 }
 
-SoundLevel soundLevel() {
-  return static_cast<SoundLevel>(currentLevel.load());
+uint8_t soundVolume() {
+  return currentVolume.load();
 }
 
 bool queueAudioCue(AudioCue cue) {
-  if (!cueQueue || soundLevel() == SoundLevel::Off) return false;
+  if (!cueQueue || soundVolume() == 0) return false;
   return xQueueOverwrite(cueQueue, &cue) == pdPASS;
 }
 }

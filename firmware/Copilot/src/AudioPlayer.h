@@ -1,6 +1,5 @@
 #pragma once
 #include <cstdint>
-#include "SoundLevel.h"
 
 namespace copilot {
 enum class AudioCue : uint8_t {
@@ -13,7 +12,7 @@ enum class AudioCue : uint8_t {
 
 bool beginAudio();
 bool audioReady();
-void setSoundLevel(SoundLevel level);
-SoundLevel soundLevel();
+void setSoundVolume(uint8_t volume);
+uint8_t soundVolume();
 bool queueAudioCue(AudioCue cue);
 }

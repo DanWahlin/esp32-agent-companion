@@ -1,15 +1,13 @@
 #pragma once
 #include <cstdint>
-#include "SoundLevel.h"
 
 namespace copilot {
 enum class SettingsAction : uint8_t {
   None,
   BrightnessDown,
   BrightnessUp,
-  SoundOff,
-  SoundQuiet,
-  SoundNormal,
+  SoundDown,
+  SoundUp,
   Idle,
   Surprise,
   Working,
@@ -20,15 +18,17 @@ enum class SettingsAction : uint8_t {
 
 class SettingsMenu {
  public:
-  explicit SettingsMenu(uint8_t brightness, SoundLevel soundLevel = SoundLevel::Quiet)
-      : brightness_(brightness), soundLevel_(soundLevel) {}
+  explicit SettingsMenu(uint8_t brightness, uint8_t soundVolume = 50)
+      : brightness_(brightness), soundVolume_(soundVolume) {}
 
   bool isOpen() const { return open_; }
   void open() { open_ = true; }
   void close() { open_ = false; }
   uint8_t brightness() const { return brightness_; }
-  SoundLevel soundLevel() const { return soundLevel_; }
-  void setSoundLevel(SoundLevel soundLevel) { soundLevel_ = soundLevel; }
+  uint8_t soundVolume() const { return soundVolume_; }
+  void setSoundVolume(uint8_t soundVolume) {
+    soundVolume_ = soundVolume > 100 ? 100 : soundVolume;
+  }
 
   SettingsAction tap(int16_t x, int16_t y) {
     if (!open_) return SettingsAction::None;
@@ -40,17 +40,13 @@ class SettingsMenu {
       brightness_ = brightness_ < 230 ? brightness_ + 25 : 255;
       return SettingsAction::BrightnessUp;
     }
-    if (inside(x, y, 86, 162, 90, 38)) {
-      soundLevel_ = SoundLevel::Off;
-      return SettingsAction::SoundOff;
+    if (inside(x, y, 150, 162, 48, 38)) {
+      soundVolume_ = soundVolume_ > 25 ? soundVolume_ - 25 : 0;
+      return SettingsAction::SoundDown;
     }
-    if (inside(x, y, 184, 162, 98, 38)) {
-      soundLevel_ = SoundLevel::Quiet;
-      return SettingsAction::SoundQuiet;
-    }
-    if (inside(x, y, 290, 162, 90, 38)) {
-      soundLevel_ = SoundLevel::Normal;
-      return SettingsAction::SoundNormal;
+    if (inside(x, y, 268, 162, 48, 38)) {
+      soundVolume_ = soundVolume_ < 75 ? soundVolume_ + 25 : 100;
+      return SettingsAction::SoundUp;
     }
     if (inside(x, y, 58, 230, 165, 42)) return SettingsAction::Idle;
     if (inside(x, y, 243, 230, 165, 42)) return SettingsAction::Working;
@@ -67,7 +63,7 @@ class SettingsMenu {
   }
 
   uint8_t brightness_;
-  SoundLevel soundLevel_;
+  uint8_t soundVolume_;
   bool open_ = false;
 };
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 namespace copilot {
 constexpr int kDisplaySize = 466;
@@ -19,8 +20,9 @@ constexpr int kAudioWordSelectPin = 45;
 constexpr int kAudioDataOutPin = 8;
 constexpr int kAudioAmplifierPin = 46;
 constexpr unsigned kAudioSampleRate = 24000;
-constexpr int kAudioQuietVolume = 30;
-constexpr int kAudioNormalVolume = 50;
+constexpr uint8_t kDefaultSoundVolume = 50;
+constexpr int kAudioMinimumCodecVolume = 68;
+constexpr int kAudioMaximumCodecVolume = 82;
 constexpr int kSpiFrequency = 80000000;
 constexpr int kTouchSda = 15;
 constexpr int kTouchScl = 14;
