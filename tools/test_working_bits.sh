@@ -44,7 +44,7 @@ for direction in (0, 1, 9):
                 f'Orbit clearance too small: direction={direction}, pose={pose}')
         for y in range(0, 33):
             for lane in (176, 188, 210, 222):
-                for x in range(lane, lane + 4):
+                for x in range(lane, lane + 5):
                     offset = (y * width + inset + x) * 2
                     assert frame[offset:offset + 2] == b'\0\0', (
                         f'Artwork hides binary lane: direction={direction}, pose={pose}, x={x}, y={y}')

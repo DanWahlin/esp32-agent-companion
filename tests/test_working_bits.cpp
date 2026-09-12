@@ -13,8 +13,8 @@ namespace {
 constexpr size_t kPixels = kCharacterFrameWidth * kCharacterFrameHeight;
 std::array<uint16_t, kPixels + 2> first{}, second{};
 bool forbidAllocations = false;
-constexpr uint8_t zero[] = {6, 9, 9, 9, 9, 9, 6};
-constexpr uint8_t one[] = {2, 6, 2, 2, 2, 2, 7};
+constexpr uint8_t zero[] = {14, 17, 17, 17, 17, 17, 17, 17, 14};
+constexpr uint8_t one[] = {4, 12, 4, 4, 4, 4, 4, 4, 14};
 }
 
 void* operator new(size_t size) {
@@ -43,10 +43,10 @@ void draw(CharacterEffects& effects, CharacterState state, uint16_t* frame) {
 
 void glyph(const uint16_t* frame, int x, int y, const uint8_t* rows) {
   x += kCharacterArtX;
-  for (int row = 0; row < 7; ++row) {
-    for (int column = 0; column < 4; ++column) {
+  for (int row = 0; row < 9; ++row) {
+    for (int column = 0; column < 5; ++column) {
       if (bool(frame[(y + row) * kCharacterFrameWidth + x + column])
-          != bool(rows[row] & (1 << (3 - column)))) {
+          != bool(rows[row] & (1 << (4 - column)))) {
         std::cerr << "Glyph mismatch at " << x << ',' << y << " cell " << column << ',' << row << '\n';
         assert(false);
       }
@@ -95,28 +95,28 @@ void visibleShapesAndDirection() {
   CharacterEffects effects(first.data() + 1, second.data() + 1);
   draw(effects, working(1.f), first.data() + 1);
   // Two independent incoming digits, and a zero travelling in the opposite direction.
-  glyph(first.data() + 1, 176, 18, zero);
-  glyph(first.data() + 1, 176, 67, one);
-  glyph(first.data() + 1, 210, 42, zero);
-  glyph(first.data() + 1, 222, 30, one);
+  glyph(first.data() + 1, 176, 16, zero);
+  glyph(first.data() + 1, 176, 66, one);
+  glyph(first.data() + 1, 210, 41, zero);
+  glyph(first.data() + 1, 222, 28, one);
   draw(effects, working(1.2f), second.data() + 1);
-  glyph(second.data() + 1, 176, 22, zero);
+  glyph(second.data() + 1, 176, 21, zero);
   glyph(second.data() + 1, 176, 71, one);
-  glyph(second.data() + 1, 210, 37, zero);
-  glyph(second.data() + 1, 222, 25, one);
+  glyph(second.data() + 1, 210, 36, zero);
+  glyph(second.data() + 1, 222, 23, one);
   auto brightness = [&](float seconds, int y) {
     draw(effects, working(seconds), first.data() + 1);
-    const uint16_t stored = first[1 + y * kCharacterFrameWidth + 177 + kCharacterArtX];
+    const uint16_t stored = first[1 + y * kCharacterFrameWidth + 176 + kCharacterArtX];
     const uint16_t rgb = static_cast<uint16_t>((stored << 8) | (stored >> 8));
     return (rgb >> 11) + ((rgb >> 5) & 63) + (rgb & 31);
   };
   const int entering = brightness(.4f, 3), middle = brightness(1.f, 18);
-  const int leaving = brightness(3.8f, 86);
+  const int leaving = brightness(3.8f, 88);
   assert(entering == middle && leaving > 0 && leaving < middle);
   for (const auto& sample : {std::pair<float, int>{.2f, 176}, {2.8f, 210}}) {
     draw(effects, working(sample.first), first.data() + 1);
     bool reachesEdge = false;
-    for (int x = sample.second; x < sample.second + 4; ++x)
+    for (int x = sample.second; x < sample.second + 5; ++x)
       reachesEdge |= first[1 + x + kCharacterArtX] != 0;
     assert(reachesEdge);
   }
@@ -159,7 +159,7 @@ void continuityAndPoseIndependence() {
   // The wrapping particle is entirely dark on both sides of its teleport.
   for (float seconds : {3.9999f, 4.f, 4.0001f}) {
     draw(effects, working(seconds), first.data() + 1);
-    for (int x = 176; x < 180; ++x) {
+    for (int x = 176; x < 181; ++x) {
       for (int y = 0; y <= 5; ++y) assert(first[1 + y * kCharacterFrameWidth + x + kCharacterArtX] == 0);
       for (int y = 91; y <= 97; ++y) assert(first[1 + y * kCharacterFrameWidth + x + kCharacterArtX] == 0);
     }

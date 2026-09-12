@@ -76,9 +76,12 @@ void CharacterEffects::spark(int x, int y, int radius, uint16_t rgb) {
 }
 
 void CharacterEffects::workingBits(double seconds) {
-  constexpr uint8_t glyphs[2][7] = {{6, 9, 9, 9, 9, 9, 6}, {2, 6, 2, 2, 2, 2, 7}};
+  constexpr uint8_t glyphs[2][9] = {
+    {14, 17, 17, 17, 17, 17, 17, 17, 14},
+    {4, 12, 4, 4, 4, 4, 4, 4, 14},
+  };
   constexpr int lanes[] = {-24, -12, 10, 22};
-  constexpr int top = -kFrameY - 7, bottom = 34;
+  constexpr int top = -kFrameY - 9, bottom = 34;
   // Recycle beyond the physical top edge; fade only where digits meet the head.
   const double cycle = seconds / 4;
   for (int lane = 0; lane < 4; ++lane) {
@@ -92,9 +95,9 @@ void CharacterEffects::workingBits(double seconds) {
       const int y = lane < 2 ? top + travel : bottom - travel;
       const int x = kFrameWidth / 2 + lanes[lane];
       const uint8_t* glyph = glyphs[(lane + slot) % 2];
-      for (int row = 0; row < 7; ++row)
-        for (int column = 0; column < 4; ++column)
-          if (glyph[row] & (1 << (3 - column))) pixel(x + column, y + row, rgb);
+      for (int row = 0; row < 9; ++row)
+        for (int column = 0; column < 5; ++column)
+          if (glyph[row] & (1 << (4 - column))) pixel(x + column, y + row, rgb);
     }
   }
 }
