@@ -5,8 +5,8 @@
 namespace copilot {
 constexpr uint32_t kAudioPcmSampleRate = 24000;
 extern const int16_t kAudioWorking[];
-constexpr uint32_t kAudioWorkingSamples = 13920;
-constexpr const char* kAudioWorkingSha256 = "3e5709c9487a412b4bba0a723995124bcb6bc60297ff7993c28cf149b9ed58e6";
+constexpr uint32_t kAudioWorkingSamples = 11040;
+constexpr const char* kAudioWorkingSha256 = "b568c145d7807ef4b40324f4a16faf7a8dd3ac02d63430e2f37b9b5e7e2d72fc";
 extern const int16_t kAudioAttention[];
 constexpr uint32_t kAudioAttentionSamples = 10560;
 constexpr const char* kAudioAttentionSha256 = "c7de5e0d0dba1122a7a602f38a64fecc44b81c37ec800f03d2fc44d3a566d549";
