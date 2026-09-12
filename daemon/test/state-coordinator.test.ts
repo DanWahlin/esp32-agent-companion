@@ -35,6 +35,18 @@ test('keeps attention sticky until the developer responds', () => {
   coordinator.close();
 });
 
+test('resumed tool activity clears an answered attention request', () => {
+  const states: CharacterState[] = [];
+  const coordinator = new StateCoordinator(state => states.push(state));
+  coordinator.handle('userPromptSubmitted', {sessionId: 'one'});
+  coordinator.handle('notification', {sessionId: 'one', notification_type: 'elicitation_dialog'});
+  assert.equal(coordinator.state, 'attention');
+  coordinator.handle('preToolUse', {sessionId: 'one', toolName: 'bash'});
+  assert.equal(coordinator.state, 'working');
+  assert.deepEqual(states, ['working', 'attention', 'working']);
+  coordinator.close();
+});
+
 test('does not celebrate a turn that performed no work', () => {
   const states: CharacterState[] = [];
   const coordinator = new StateCoordinator(state => states.push(state));

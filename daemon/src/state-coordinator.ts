@@ -48,6 +48,7 @@ export class StateCoordinator {
         break;
       case 'preToolUse':
         session.active = true;
+        session.attention = false;
         session.hadWork = true;
         break;
       case 'subagentStart':
