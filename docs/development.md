@@ -157,6 +157,8 @@ reaction modes passed. These measurements do not yet exercise SD cache hits.
 Copilot hooks send lifecycle JSON over a user-private Unix socket; the daemon
 aggregates concurrent sessions and subagents, then writes bounded mode commands
 through the first `/dev/cu.usbmodem*` device without toggling DTR/RTS or HUPCL.
+Needs attention has global priority, followed by Working; Complete plays only
+when the last active task finishes.
 
 ```bash
 cd daemon
@@ -171,6 +173,17 @@ The installer writes `~/.copilot/hooks/agent-companion.json` and a
 or disconnected device never blocks Copilot. Restart Copilot CLI after changing
 hook configuration. The daemon only transmits lifecycle state and session IDs;
 it does not send prompts, responses, source code, or tool arguments to the ESP32.
+
+The daemon persists minimal lease metadata in
+`~/Library/Application Support/ESP32 Agent Companion/state.json`, written
+atomically with user-only permissions. Main-agent work leases last ten minutes;
+attention and subagent leases last thirty minutes and are renewed by subsequent
+events. Pre- and post-tool hooks renew main-agent work so a long build does not
+expire immediately after it finishes. Expired leases return the aggregate to the
+next valid state instead of leaving the display stuck after a crashed CLI. Hook
+timestamps reject delayed main-agent or subagent events. Complete is
+intentionally not recovered after a restart, preventing an old celebration from
+replaying when the device reconnects.
 
 ### Character Lab
 

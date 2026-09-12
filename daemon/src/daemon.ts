@@ -2,13 +2,20 @@ import {chmod, mkdir, unlink} from 'node:fs/promises';
 import {createConnection, createServer, type Socket} from 'node:net';
 import {dirname} from 'node:path';
 import {characterStates, hookEvents, type DaemonRequest, type DaemonStatus} from './protocol.js';
-import {socketPath} from './paths.js';
+import {socketPath, statePath} from './paths.js';
 import {StateCoordinator} from './state-coordinator.js';
+import {StateStore} from './state-store.js';
 import {UsbTransport} from './usb-transport.js';
 
 export async function runDaemon(): Promise<void> {
   const usb = new UsbTransport();
-  const coordinator = new StateCoordinator(state => usb.setState(state));
+  const store = new StateStore(statePath());
+  const restored = await store.load();
+  const coordinator = new StateCoordinator(state => usb.setState(state), {
+    restored,
+    onMutation: state => store.schedule(state),
+  });
+  usb.setState(coordinator.state);
   const path = socketPath();
   await mkdir(dirname(path), {recursive: true});
   await removeStaleSocket(path);
@@ -31,6 +38,7 @@ export async function runDaemon(): Promise<void> {
 
   const shutdown = async () => {
     coordinator.close();
+    await store.flush(coordinator.snapshot());
     await usb.stop();
     await new Promise<void>(resolve => server.close(() => resolve()));
     await unlink(path).catch(() => undefined);

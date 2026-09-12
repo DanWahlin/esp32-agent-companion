@@ -31,6 +31,8 @@ const hooks = {
     sessionStart: command('sessionStart'),
     userPromptSubmitted: command('userPromptSubmitted'),
     preToolUse: command('preToolUse'),
+    postToolUse: command('postToolUse'),
+    postToolUseFailure: command('postToolUseFailure'),
     subagentStart: command('subagentStart'),
     subagentStop: command('subagentStop'),
     agentStop: command('agentStop'),

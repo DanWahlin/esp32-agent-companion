@@ -47,7 +47,9 @@ npm run install:macos
 Restart Copilot CLI after installation so it loads the user-level hooks. The
 daemon maps active main-agent or subagent work to Working, permission and
 elicitation prompts to Needs attention, verified tool-using turns to Complete,
-and inactive sessions to Idle.
+and inactive sessions to Idle. Multiple CLI sessions are aggregated rather than
+overwriting one another. Timestamped leases discard abandoned work, while a
+private local state file restores still-active sessions after a daemon restart.
 
 <p align="center">
   <img src="preview/agent-companion-demo.gif" alt="ESP32 Agent Companion cycling through Idle, Surprise, Working, Needs attention, and Complete states" width="400">

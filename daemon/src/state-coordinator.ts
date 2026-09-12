@@ -1,23 +1,71 @@
 import type {CharacterState, HookEvent, HookPayload} from './protocol.js';
 
-interface SessionState {
-  active: boolean;
-  attention: boolean;
+export interface PersistedSubagent {
+  id: string;
+  instances: number;
+  leaseUntil: number;
+  lastEventAt: number;
+}
+
+export interface PersistedSession {
+  id: string;
+  activeUntil: number;
+  attentionUntil: number;
+  lastMainEventAt: number;
+  lastSeenAt: number;
   hadWork: boolean;
   completionPending: boolean;
-  subagents: Set<string>;
+  subagents: PersistedSubagent[];
+}
+
+export interface PersistedCoordinatorState {
+  version: 1;
+  sessions: PersistedSession[];
+}
+
+interface SessionState extends Omit<PersistedSession, 'subagents'> {
+  subagents: Map<string, PersistedSubagent>;
+}
+
+export interface StateCoordinatorOptions {
+  completeMs?: number;
+  activeLeaseMs?: number;
+  attentionLeaseMs?: number;
+  subagentLeaseMs?: number;
+  retainedSessionMs?: number;
+  sweepMs?: number;
+  now?: () => number;
+  restored?: PersistedCoordinatorState;
+  onMutation?: (state: PersistedCoordinatorState) => void;
 }
 
 export class StateCoordinator {
   readonly #sessions = new Map<string, SessionState>();
   readonly #onState: (state: CharacterState) => void;
+  readonly #onMutation: ((state: PersistedCoordinatorState) => void) | undefined;
+  readonly #now: () => number;
   readonly #completeMs: number;
+  readonly #activeLeaseMs: number;
+  readonly #attentionLeaseMs: number;
+  readonly #subagentLeaseMs: number;
+  readonly #retainedSessionMs: number;
   #state: CharacterState = 'idle';
   #completeTimer: NodeJS.Timeout | undefined;
+  #sweepTimer: NodeJS.Timeout | undefined;
 
-  constructor(onState: (state: CharacterState) => void, completeMs = 4000) {
+  constructor(onState: (state: CharacterState) => void, options: StateCoordinatorOptions = {}) {
     this.#onState = onState;
-    this.#completeMs = completeMs;
+    this.#onMutation = options.onMutation;
+    this.#now = options.now ?? Date.now;
+    this.#completeMs = options.completeMs ?? 4000;
+    this.#activeLeaseMs = options.activeLeaseMs ?? 10 * 60_000;
+    this.#attentionLeaseMs = options.attentionLeaseMs ?? 30 * 60_000;
+    this.#subagentLeaseMs = options.subagentLeaseMs ?? 30 * 60_000;
+    this.#retainedSessionMs = options.retainedSessionMs ?? 60 * 60_000;
+    this.#restore(options.restored);
+    this.sweep();
+    const sweepMs = options.sweepMs ?? 5000;
+    if (sweepMs > 0) this.#sweepTimer = setInterval(() => this.sweep(), sweepMs);
   }
 
   get state(): CharacterState {
@@ -28,65 +76,154 @@ export class StateCoordinator {
     return this.#sessions.size;
   }
 
-  handle(event: HookEvent, payload: HookPayload): void {
+  handle(event: HookEvent, payload: HookPayload): boolean {
+    const now = this.#now();
+    const occurredAt = this.#eventTime(payload, now);
     const sessionId = this.#sessionId(payload);
     if (event === 'sessionEnd') {
+      const session = this.#sessions.get(sessionId);
+      if (session && occurredAt < session.lastMainEventAt) return false;
       this.#sessions.delete(sessionId);
-      this.#recompute();
-      return;
+      this.#changed();
+      return true;
     }
-    const session = this.#session(sessionId);
+    const session = this.#session(sessionId, now);
+    if (event === 'subagentStart' || event === 'subagentStop') {
+      const {id: agentId, counted} = this.#agentIdentity(payload);
+      const existing = session.subagents.get(agentId);
+      if (existing && occurredAt < existing.lastEventAt) return false;
+      if (event === 'subagentStart') {
+        session.hadWork = true;
+        session.subagents.set(agentId, {
+          id: agentId,
+          instances: counted ? (existing?.instances ?? 0) + 1 : 1,
+          leaseUntil: occurredAt + this.#subagentLeaseMs,
+          lastEventAt: occurredAt,
+        });
+      } else if (existing && existing.instances > 1) {
+        session.subagents.set(agentId, {
+          ...existing,
+          instances: existing.instances - 1,
+          lastEventAt: occurredAt,
+        });
+      } else {
+        session.subagents.delete(agentId);
+      }
+      session.lastSeenAt = now;
+      this.#changed();
+      return true;
+    }
+    if (occurredAt < session.lastMainEventAt) return false;
+    session.lastMainEventAt = occurredAt;
+    session.lastSeenAt = now;
     switch (event) {
       case 'sessionStart':
         break;
       case 'userPromptSubmitted':
-        session.active = true;
-        session.attention = false;
+        session.activeUntil = occurredAt + this.#activeLeaseMs;
+        session.attentionUntil = 0;
         session.hadWork = false;
         session.completionPending = false;
         this.#cancelComplete();
         break;
       case 'preToolUse':
-        session.active = true;
-        session.attention = false;
+      case 'postToolUse':
+      case 'postToolUseFailure':
+        session.activeUntil = occurredAt + this.#activeLeaseMs;
+        session.attentionUntil = 0;
         session.hadWork = true;
-        break;
-      case 'subagentStart':
-        session.hadWork = true;
-        session.subagents.add(this.#agentId(payload));
-        break;
-      case 'subagentStop':
-        session.subagents.delete(this.#agentId(payload));
         break;
       case 'notification':
       case 'errorOccurred':
-        session.active = false;
-        session.attention = true;
+        session.activeUntil = 0;
+        session.attentionUntil = occurredAt + this.#attentionLeaseMs;
         this.#cancelComplete();
         break;
       case 'agentStop':
-        session.active = false;
-        session.completionPending = session.hadWork && !session.attention;
+        session.activeUntil = 0;
+        session.completionPending = session.hadWork && session.attentionUntil <= now;
         break;
       default:
         event satisfies never;
     }
-    this.#recompute();
+    this.#changed();
+    return true;
+  }
+
+  sweep(): void {
+    const now = this.#now();
+    let mutated = false;
+    for (const [id, session] of this.#sessions) {
+      if (session.activeUntil > 0 && session.activeUntil <= now) {
+        session.activeUntil = 0;
+        mutated = true;
+      }
+      if (session.attentionUntil > 0 && session.attentionUntil <= now) {
+        session.attentionUntil = 0;
+        mutated = true;
+      }
+      for (const [agentId, agent] of session.subagents) {
+        if (agent.leaseUntil > now) continue;
+        session.subagents.delete(agentId);
+        mutated = true;
+      }
+      const active = session.activeUntil > now || session.attentionUntil > now
+        || session.subagents.size > 0 || session.completionPending;
+      if (!active && now - session.lastSeenAt >= this.#retainedSessionMs) {
+        this.#sessions.delete(id);
+        mutated = true;
+      }
+    }
+    if (mutated) this.#changed();
+    else this.#recompute(now);
+  }
+
+  snapshot(): PersistedCoordinatorState {
+    return {
+      version: 1,
+      sessions: [...this.#sessions.values()].map(session => ({
+        id: session.id,
+        activeUntil: session.activeUntil,
+        attentionUntil: session.attentionUntil,
+        lastMainEventAt: session.lastMainEventAt,
+        lastSeenAt: session.lastSeenAt,
+        hadWork: session.hadWork,
+        completionPending: false,
+        subagents: [...session.subagents.values()].map(agent => ({...agent})),
+      })),
+    };
   }
 
   close(): void {
     this.#cancelComplete();
+    if (this.#sweepTimer) clearInterval(this.#sweepTimer);
+    this.#sweepTimer = undefined;
   }
 
-  #session(id: string): SessionState {
+  #restore(restored: PersistedCoordinatorState | undefined): void {
+    if (!restored || restored.version !== 1) return;
+    for (const saved of restored.sessions) {
+      if (!saved.id || !Number.isFinite(saved.lastSeenAt)) continue;
+      this.#sessions.set(saved.id, {
+        ...saved,
+        completionPending: false,
+        subagents: new Map(saved.subagents.map(agent => [agent.id, {...agent}])),
+      });
+    }
+  }
+
+  #session(id: string, now: number): SessionState {
     let session = this.#sessions.get(id);
     if (!session) {
       session = {
-        active: false,
-        attention: false,
+        id,
+        activeUntil: 0,
+        attentionUntil: 0,
+        lastMainEventAt: 0,
+        lastSeenAt: now,
         hadWork: false,
         completionPending: false,
-        subagents: new Set(),
+        subagents: new Map(),
       };
       this.#sessions.set(id, session);
     }
@@ -98,18 +235,42 @@ export class StateCoordinator {
     return typeof value === 'string' && value ? value : 'unknown-session';
   }
 
-  #agentId(payload: HookPayload): string {
-    const value = payload.agentId ?? payload.agent_id ?? payload.agentName ?? payload.agent_name;
-    return typeof value === 'string' && value ? value : 'unknown-agent';
+  #agentIdentity(payload: HookPayload): {id: string; counted: boolean} {
+    const unique = payload.agentId ?? payload.agent_id;
+    if (typeof unique === 'string' && unique) return {id: `id:${unique}`, counted: false};
+    const toolCall = payload.toolCallId ?? payload.tool_call_id;
+    if (typeof toolCall === 'string' && toolCall) return {id: `call:${toolCall}`, counted: false};
+    const name = payload.agentName ?? payload.agent_name;
+    return {
+      id: `name:${typeof name === 'string' && name ? name : 'unknown-agent'}`,
+      counted: true,
+    };
   }
 
-  #recompute(): void {
+  #eventTime(payload: HookPayload, fallback: number): number {
+    const value = payload.timestamp;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value <= fallback + 60_000 ? value : fallback;
+    }
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed) && parsed <= fallback + 60_000) return parsed;
+    }
+    return fallback;
+  }
+
+  #changed(): void {
+    this.#recompute(this.#now());
+    this.#onMutation?.(this.snapshot());
+  }
+
+  #recompute(now: number): void {
     const sessions = [...this.#sessions.values()];
-    if (sessions.some(session => session.attention)) {
+    if (sessions.some(session => session.attentionUntil > now)) {
       this.#setState('attention');
       return;
     }
-    if (sessions.some(session => session.active || session.subagents.size > 0)) {
+    if (sessions.some(session => session.activeUntil > now || session.subagents.size > 0)) {
       this.#setState('working');
       return;
     }
@@ -127,7 +288,8 @@ export class StateCoordinator {
     this.#setState('complete');
     this.#completeTimer = setTimeout(() => {
       this.#completeTimer = undefined;
-      this.#recompute();
+      this.#recompute(this.#now());
+      this.#onMutation?.(this.snapshot());
     }, this.#completeMs);
   }
 

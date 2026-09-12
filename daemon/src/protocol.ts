@@ -5,6 +5,8 @@ export const hookEvents = [
   'sessionStart',
   'userPromptSubmitted',
   'preToolUse',
+  'postToolUse',
+  'postToolUseFailure',
   'subagentStart',
   'subagentStop',
   'agentStop',
@@ -19,8 +21,13 @@ export interface HookPayload {
   session_id?: string;
   agentId?: string;
   agent_id?: string;
+  agentName?: string;
+  agent_name?: string;
   toolName?: string;
   tool_name?: string;
+  toolCallId?: string;
+  tool_call_id?: string;
+  timestamp?: number | string;
   notification_type?: string;
   [key: string]: unknown;
 }
