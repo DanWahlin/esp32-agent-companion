@@ -38,6 +38,11 @@ uint32_t worstPresentationGap = 0;
 bool captureInterrupted = false;
 SettingsMenu settings(kBrightness);
 
+struct ModeRequest {
+  CharacterMode mode = CharacterMode::Idle;
+  bool returnToIdle = false;
+};
+
 void logMessage(const char* format, ...) {
   char message[384];
   va_list arguments;
@@ -100,10 +105,14 @@ void animate(void*) {
     Frame* frame;
     xQueueReceive(freeFrames, &frame, portMAX_DELAY);
     const int64_t start = esp_timer_get_time();
-    CharacterMode command;
+    ModeRequest command;
     while (xQueueReceive(commands, &command, 0) == pdTRUE) {
-      if (command == CharacterMode::Surprise) motion.surprise();
-      else if (!motion.setMode(command)) fatal(motion.error());
+      if (command.mode == CharacterMode::Surprise) {
+        if (command.returnToIdle) motion.surpriseToIdle();
+        else motion.surprise();
+      } else if (!motion.setMode(command.mode)) {
+        fatal(motion.error());
+      }
       if (motion.error()) fatal(motion.error());
     }
     motion.update((start - previous) / 1000000.0);
@@ -191,20 +200,29 @@ const char* modeName(CharacterMode mode) {
 }
 
 void queueMode(DeviceCommand command) {
-  CharacterMode mode;
+  ModeRequest request;
   switch (command) {
-    case DeviceCommand::Idle: mode = CharacterMode::Idle; break;
-    case DeviceCommand::Surprise: mode = CharacterMode::Surprise; break;
-    case DeviceCommand::Working: mode = CharacterMode::Working; break;
-    case DeviceCommand::Complete: mode = CharacterMode::Complete; break;
-    case DeviceCommand::Attention: mode = CharacterMode::Attention; break;
+    case DeviceCommand::Idle: request.mode = CharacterMode::Idle; break;
+    case DeviceCommand::Surprise: request.mode = CharacterMode::Surprise; break;
+    case DeviceCommand::Working: request.mode = CharacterMode::Working; break;
+    case DeviceCommand::Complete: request.mode = CharacterMode::Complete; break;
+    case DeviceCommand::Attention: request.mode = CharacterMode::Attention; break;
     default: logMessage("COMMAND_ERROR unknown mode\n"); return;
   }
-  if (xQueueSend(commands, &mode, 0) != pdTRUE) {
+  if (xQueueSend(commands, &request, 0) != pdTRUE) {
     logMessage("COMMAND_ERROR mode queue full\n");
     return;
   }
   logMessage("COMMAND accepted=%s\n", commandName(command));
+}
+
+void queueTouchSurprise() {
+  const ModeRequest request{CharacterMode::Surprise, true};
+  if (xQueueSend(commands, &request, 0) != pdTRUE) {
+    logMessage("COMMAND_ERROR mode queue full\n");
+    return;
+  }
+  logMessage("COMMAND accepted=surprise source=touch return=idle\n");
 }
 
 void drawSettingsButton(int x, int y, int width, const char* label, bool selected,
@@ -297,7 +315,7 @@ void handleTouchGesture(const TouchGesture& gesture, const Frame& frame) {
     if (x >= 0 && y >= 0 && x < kCharacterFrameWidth && y < kCharacterFrameHeight
         && frame.pixels[y * kCharacterFrameWidth + x] != 0) {
       logMessage("TOUCH tap x=%d y=%d\n", gesture.endX, gesture.endY);
-      queueMode(DeviceCommand::Surprise);
+      queueTouchSurprise();
     }
     return;
   }
@@ -385,7 +403,7 @@ void setup() {
   void* memory = allocate(sizeof(SpriteRenderer), MALLOC_CAP_INTERNAL, "Renderer allocation failed.");
   freeFrames = xQueueCreate(2, sizeof(Frame*));
   readyFrames = xQueueCreate(2, sizeof(Frame*));
-  commands = xQueueCreate(8, sizeof(CharacterMode));
+  commands = xQueueCreate(8, sizeof(ModeRequest));
   if (!freeFrames || !readyFrames || !commands) fatal("Frame or command queue allocation failed.");
   for (auto& frame : frames) {
     frame.pixels = static_cast<uint16_t*>(allocate(kCharacterFrameWidth * kCharacterFrameHeight * 2,

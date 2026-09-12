@@ -16,7 +16,8 @@ built-in character.
 ## What it does
 
 - **Natural motion:** smooth 30 FPS playback, eight looking directions, and occasional blinks.
-- **Touch reactions:** tap the character for a quick spring-like recoil and widened eyes.
+- **Touch reactions:** tap the character for a quick spring-like recoil and widened eyes,
+  then return to Idle.
 - **On-device settings:** swipe up to adjust brightness or select a character state.
 - **Agent states:** focused eyes and orbiting dots for Working, a celebration for Complete,
   and curious head tilts for Needs attention.
@@ -105,7 +106,8 @@ anything needed from its previous firmware first. The installer does not run a
 whole-chip erase or modify your microSD card.
 
 When flashing finishes, the device restarts and the character begins looking
-around. Tap it to try the touch reaction, or swipe up to open settings. The menu
+around. Tap it to try the touch reaction; it returns to Idle when the spring
+finishes. Swipe up to open settings. The menu
 adjusts display brightness and selects Idle, Surprise, Working, Complete, or
 Needs attention. Swipe down or tap Close to return to the character.
 

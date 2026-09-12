@@ -306,6 +306,13 @@ static void springSurprise() {
         assert(motion.state().mode == resume && motion.state().requestedMode == resume);
       }
     }
+    CharacterMotion tapped(42, 13);
+    assert(tapped.setMode(Mode::Attention));
+    until(tapped, [](const auto& s) { return s.mode == Mode::Attention && s.pose.index == 23; });
+    tapped.surpriseToIdle();
+    until(tapped, [](const auto& s) { return s.mode == Mode::Surprise; });
+    until(tapped, [](const auto& s) { return s.mode == Mode::Idle; });
+    assert(tapped.state().requestedMode == Mode::Idle);
   }
     for (int index : {0, 1, 4, 8, 16, 22, 23}) {
       for (Mode next : {Mode::Idle, Mode::Surprise, Mode::Working, Mode::Complete, Mode::Attention}) {

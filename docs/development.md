@@ -178,8 +178,10 @@ Click/tap the character, or focus it and press Enter/Space, to trigger surprise.
 Keys 1-5 select the five modes including idle. Pause freezes both expression and
 effects; the speed selector includes half and quarter speed for inspection.
 On the physical device, a tap is recognized only after release so a swipe cannot
-trigger Surprise first. Swipe up opens the settings menu for brightness and
-character-state selection; swipe down or tap Close to dismiss it.
+trigger Surprise first. A tapped Surprise returns to Idle after the spring,
+regardless of the previous persistent state. Explicit Surprise signals retain
+their existing resume behavior. Swipe up opens the settings menu for brightness
+and character-state selection; swipe down or tap Close to dismiss it.
 All four mode links are also prominently available on `/sprite-preview.html`.
 Transitions use shared-center artwork before switching tracks. The spring
 reaction settles forward to its neutral final frame rather than reversing the impact.

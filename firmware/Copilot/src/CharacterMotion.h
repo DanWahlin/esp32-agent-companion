@@ -21,6 +21,7 @@ class CharacterMotion {
   void update(double dt);
   bool setMode(CharacterMode mode);
   void surprise();
+  void surpriseToIdle();
   CharacterState state() const;
   const char* error() const { return error_; }
   void setPlaying(bool value) { playing_ = value; }

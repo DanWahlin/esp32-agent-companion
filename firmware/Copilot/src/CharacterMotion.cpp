@@ -64,6 +64,11 @@ bool CharacterMotion::setMode(CharacterMode mode) {
 
 void CharacterMotion::surprise() { setMode(CharacterMode::Surprise); }
 
+void CharacterMotion::surpriseToIdle() {
+  persistent_ = CharacterMode::Idle;
+  setMode(CharacterMode::Surprise);
+}
+
 CharacterState CharacterMotion::state() const {
   SpritePose pose = mode_ == CharacterMode::Idle ? idle_.pose() : pose_;
   pose.blinkLevel = idle_.pose().blinkLevel;
