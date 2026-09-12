@@ -4,10 +4,6 @@
 
 # ESP32 Agent Companion
 
-<p align="center">
-  <img src="preview/agent-companion-demo.gif" alt="ESP32 Agent Companion cycling through Idle, Surprise, Working, Needs attention, and Complete states" width="400">
-</p>
-
 A small, expressive companion for your desk. Its first character is inspired by
 GitHub Copilot and comes to life on a round AMOLED touchscreen: it looks around,
 blinks, reacts when tapped, and can display Working, Complete, and Needs attention
@@ -30,6 +26,10 @@ cloud account, subscription, or microSD card is needed to run the built-in chara
 The character works immediately in automatic Idle mode. Agent states can be
 controlled through USB serial commands; **automatic integration with coding agents,
 additional characters, and a swipe-up settings menu are not implemented yet**.
+
+<p align="center">
+  <img src="preview/agent-companion-demo.gif" alt="ESP32 Agent Companion cycling through Idle, Surprise, Working, Needs attention, and Complete states" width="400">
+</p>
 
 ## Install
 
