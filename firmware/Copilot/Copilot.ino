@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
+#include <Preferences.h>
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
 #include <esp_system.h>
@@ -12,6 +13,7 @@
 #include "src/SpritePredictor.h"
 #include "src/SpriteStorage.h"
 #include "src/CharacterMotion.h"
+#include "src/AudioPlayer.h"
 #include "src/CharacterEffects.h"
 #include "src/DeviceCommands.h"
 #include "src/TouchInput.h"
@@ -37,6 +39,8 @@ std::atomic<uint32_t> droppedLogs{0};
 uint32_t worstPresentationGap = 0;
 bool captureInterrupted = false;
 SettingsMenu settings(kBrightness);
+constexpr char kPreferencesNamespace[] = "agent-companion";
+constexpr char kSoundPreference[] = "sound";
 
 struct ModeRequest {
   CharacterMode mode = CharacterMode::Idle;
@@ -225,19 +229,56 @@ void queueTouchSurprise() {
   logMessage("COMMAND accepted=surprise source=touch return=idle\n");
 }
 
+SoundLevel loadSoundLevel() {
+  Preferences preferences;
+  if (!preferences.begin(kPreferencesNamespace, true)) {
+    logMessage("SETTINGS_ERROR sound preference open failed\n");
+    return SoundLevel::Quiet;
+  }
+  const uint8_t stored =
+      preferences.getUChar(kSoundPreference, static_cast<uint8_t>(SoundLevel::Quiet));
+  preferences.end();
+  if (!isValidSoundLevel(stored)) {
+    logMessage("SETTINGS_ERROR invalid sound level=%u\n", static_cast<unsigned>(stored));
+    return SoundLevel::Quiet;
+  }
+  return static_cast<SoundLevel>(stored);
+}
+
+void saveSoundLevel(SoundLevel level) {
+  Preferences preferences;
+  if (!preferences.begin(kPreferencesNamespace, false)) {
+    logMessage("SETTINGS_ERROR sound preference open failed\n");
+    return;
+  }
+  if (preferences.putUChar(kSoundPreference, static_cast<uint8_t>(level)) != 1)
+    logMessage("SETTINGS_ERROR sound preference write failed\n");
+  preferences.end();
+}
+
+void queueModeCue(CharacterMode mode) {
+  switch (mode) {
+    case CharacterMode::Working: queueAudioCue(AudioCue::Working); break;
+    case CharacterMode::Attention: queueAudioCue(AudioCue::Attention); break;
+    case CharacterMode::Complete: queueAudioCue(AudioCue::Complete); break;
+    case CharacterMode::Surprise: queueAudioCue(AudioCue::Surprise); break;
+    case CharacterMode::Idle: break;
+  }
+}
+
 void drawSettingsButton(int x, int y, int width, const char* label, bool selected,
-                        uint8_t textSize = 2) {
+                        uint8_t textSize = 2, int height = 48) {
   constexpr uint16_t border = 0x5D19;
   constexpr uint16_t normal = 0x18E7;
   constexpr uint16_t active = 0x2372;
   constexpr uint16_t text = 0xE73F;
-  display.fillRoundRect(x, y, width, 48, 10, selected ? active : normal);
-  display.drawRoundRect(x, y, width, 48, 10, selected ? 0x867F : border);
+  display.fillRoundRect(x, y, width, height, 10, selected ? active : normal);
+  display.drawRoundRect(x, y, width, height, 10, selected ? 0x867F : border);
   display.setTextColor(text);
   display.setTextSize(textSize);
   const int characterWidth = 6 * textSize;
   display.setCursor(x + std::max(10, (width - static_cast<int>(std::strlen(label)) * characterWidth) / 2),
-                    y + (48 - 8 * textSize) / 2);
+                    y + (height - 8 * textSize) / 2);
   display.print(label);
 }
 
@@ -263,31 +304,39 @@ void drawSettingsMenu(CharacterMode selected) {
   display.drawRoundRect(38, 92, 390, 312, 28, 0x31CC);
   display.setTextColor(muted);
   display.setTextSize(1);
-  display.setCursor(131, 92);
-  display.print("Swipe down or tap Close to return");
-  display.setTextColor(text);
-  display.setTextSize(2);
-  display.setCursor(58, 105);
+  display.setCursor(203, 99);
   display.print("Brightness");
-  drawSettingsButton(58, 126, 90, "-", false, 3);
-  drawSettingsButton(318, 126, 90, "+", false, 3);
-  display.fillRoundRect(166, 126, 134, 48, 10, background);
+  drawSettingsButton(150, 108, 48, "-", false, 3, 38);
+  drawSettingsButton(268, 108, 48, "+", false, 3, 38);
+  display.fillRoundRect(204, 108, 58, 38, 10, background);
   display.setTextColor(text);
   display.setTextSize(2);
   char brightness[8];
   snprintf(brightness, sizeof(brightness), "%u%%",
            static_cast<unsigned>((settings.brightness() * 100 + 127) / 255));
-  display.setCursor(201, 142);
+  display.setCursor(211, 119);
   display.print(brightness);
-  display.setCursor(58, 190);
+  display.setTextColor(muted);
+  display.setTextSize(1);
+  display.setCursor(218, 151);
+  display.print("Sound");
+  drawSettingsButton(86, 162, 90, "Off", settings.soundLevel() == SoundLevel::Off,
+                     2, 38);
+  drawSettingsButton(184, 162, 98, "Quiet",
+                     settings.soundLevel() == SoundLevel::Quiet, 2, 38);
+  drawSettingsButton(290, 162, 90, "Normal",
+                     settings.soundLevel() == SoundLevel::Normal, 2, 38);
+  display.setTextColor(text);
+  display.setTextSize(2);
+  display.setCursor(58, 207);
   display.print("Character state");
-  drawSettingsButton(58, 214, 165, "Idle", selected == CharacterMode::Idle);
-  drawSettingsButton(243, 214, 165, "Working", selected == CharacterMode::Working);
-  drawSettingsButton(58, 274, 165, "Complete", selected == CharacterMode::Complete);
-  drawSettingsButton(243, 274, 165, "Needs attention",
-                     selected == CharacterMode::Attention, 1);
-  drawSettingsButton(58, 334, 165, "Surprise", selected == CharacterMode::Surprise);
-  drawSettingsButton(243, 334, 165, "Close", false);
+  drawSettingsButton(58, 230, 165, "Idle", selected == CharacterMode::Idle, 2, 42);
+  drawSettingsButton(243, 230, 165, "Working", selected == CharacterMode::Working, 2, 42);
+  drawSettingsButton(58, 282, 165, "Complete", selected == CharacterMode::Complete, 2, 42);
+  drawSettingsButton(243, 282, 165, "Needs attention",
+                     selected == CharacterMode::Attention, 1, 42);
+  drawSettingsButton(58, 334, 165, "Surprise", selected == CharacterMode::Surprise, 2, 42);
+  drawSettingsButton(243, 334, 165, "Close", false, 2, 42);
 }
 
 void clearCharacterMargins() {
@@ -299,12 +348,14 @@ void clearCharacterMargins() {
 void handleTouchGesture(const TouchGesture& gesture, const Frame& frame) {
   if (gesture.kind == TouchGestureKind::SwipeUp && !settings.isOpen()) {
     settings.open();
+    queueAudioCue(AudioCue::Settings);
     drawSettingsMenu(frame.state.requestedMode);
     logMessage("SETTINGS opened\n");
     return;
   }
   if (gesture.kind == TouchGestureKind::SwipeDown && settings.isOpen()) {
     settings.close();
+    queueAudioCue(AudioCue::Settings);
     clearCharacterMargins();
     logMessage("SETTINGS closed=swipe\n");
     return;
@@ -324,8 +375,19 @@ void handleTouchGesture(const TouchGesture& gesture, const Frame& frame) {
     case SettingsAction::BrightnessDown:
     case SettingsAction::BrightnessUp:
       display.setBrightness(settings.brightness());
+      queueAudioCue(AudioCue::Settings);
       drawSettingsMenu(frame.state.requestedMode);
       logMessage("SETTINGS brightness=%u\n", static_cast<unsigned>(settings.brightness()));
+      break;
+    case SettingsAction::SoundOff:
+    case SettingsAction::SoundQuiet:
+    case SettingsAction::SoundNormal:
+      setSoundLevel(settings.soundLevel());
+      saveSoundLevel(settings.soundLevel());
+      queueAudioCue(AudioCue::Settings);
+      drawSettingsMenu(frame.state.requestedMode);
+      logMessage("SETTINGS sound=%u\n",
+                 static_cast<unsigned>(settings.soundLevel()));
       break;
     case SettingsAction::Idle:
       settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Idle); break;
@@ -339,6 +401,7 @@ void handleTouchGesture(const TouchGesture& gesture, const Frame& frame) {
       settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Attention); break;
     case SettingsAction::Close:
       settings.close();
+      queueAudioCue(AudioCue::Settings);
       clearCharacterMargins();
       logMessage("SETTINGS closed=button\n");
       break;
@@ -364,11 +427,12 @@ void processCommand(DeviceCommand command, const Frame& frame) {
       break;
     case DeviceCommand::Info:
       logMessage("INFO protocol=%u uptime_ms=%llu reset_reason=%u mode=%s requested=%s assets=%u "
-                 "max_gap_us=%u dropped_logs=%u\n",
+                 "max_gap_us=%u dropped_logs=%u audio_ready=%u sound=%u\n",
                     kDeviceProtocol, static_cast<unsigned long long>(esp_timer_get_time() / 1000),
                     static_cast<unsigned>(esp_reset_reason()), modeName(frame.state.mode),
                     modeName(frame.state.requestedMode), kSpriteDataSize, worstPresentationGap,
-                    droppedLogs.load(std::memory_order_relaxed));
+                    droppedLogs.load(std::memory_order_relaxed), static_cast<unsigned>(audioReady()),
+                    static_cast<unsigned>(soundLevel()));
       logSdStatus(sdSpriteStatus());
       break;
     default: queueMode(command); break;
@@ -390,6 +454,10 @@ void setup() {
   display.fillScreen(0);
   if (!initializeSpriteStorage()) fatal(spriteStorageError());
   if (!initializeTouchInput()) fatal(touchInputError());
+  const SoundLevel storedSoundLevel = loadSoundLevel();
+  settings.setSoundLevel(storedSoundLevel);
+  setSoundLevel(storedSoundLevel);
+  beginAudio();
   transferBuffer = static_cast<uint8_t*>(heap_caps_aligned_alloc(
       16, kTransferBytes, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
   if (!transferBuffer) fatal("DMA staging allocation failed.");
@@ -483,6 +551,7 @@ void loop() {
   if (frame->state.eventId != previousEvent || frame->state.mode != previousMode) {
     logMessage("STATE mode=%s requested=%s event=%u\n", modeName(frame->state.mode),
                   modeName(frame->state.requestedMode), frame->state.eventId);
+    if (frame->state.mode != previousMode) queueModeCue(frame->state.mode);
     previousEvent = frame->state.eventId;
     previousMode = frame->state.mode;
   }

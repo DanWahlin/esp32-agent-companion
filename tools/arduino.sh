@@ -17,6 +17,7 @@ fi
 case "$ACTION" in
   build)
     python3 "$ROOT/tools/embed_sprites.py"
+    python3 "$ROOT/tools/embed_audio.py"
     GFX="$WAVESHARE/examples/arduino/libraries/GFX_Library_for_Arduino"
     SENSORS="$WAVESHARE/examples/arduino/libraries/SensorLib"
     if [[ ! -f "$GFX/src/display/Arduino_CO5300.cpp" ]]; then
@@ -45,6 +46,7 @@ case "$ACTION" in
       exit 1
     fi
     python3 "$ROOT/tools/embed_sprites.py"
+    python3 "$ROOT/tools/embed_audio.py"
     python3 "$ROOT/tools/firmware_artifacts.py" check
     ASSET_OFFSET="$(python3 "$ROOT/tools/firmware_artifacts.py" asset-offset)"
     EXTRA_FILES=""

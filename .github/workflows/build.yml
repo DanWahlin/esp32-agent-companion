@@ -49,10 +49,12 @@ jobs:
           python -m pip install -r requirements-art.txt -r requirements-flash.txt
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends clang zlib1g-dev
-      - name: Reproduce and verify sprite assets
+      - name: Reproduce and verify generated assets
         run: |
           python tools/export_sprite_firmware.py
+          python tools/embed_audio.py
           git diff --exit-code -- assets/sprite-firmware.bin assets/sprite-firmware.json firmware/Copilot/generated/sprite_assets.h firmware/Copilot/src/sprite_data.cpp
+          git diff --exit-code -- firmware/Copilot/generated/audio_assets.h firmware/Copilot/src/audio_data.cpp
       - name: Test native renderer and release tools
         run: |
           bash tools/test_sprite_cache.sh
@@ -62,7 +64,7 @@ jobs:
           bash tools/test_device_inputs.sh
           bash tools/run_sprite_motion_tests.sh
           bash tools/build_character_preview.sh
-          python -m unittest tests.test_sprite_firmware_assets tests.test_character_preview tests.test_device tests.test_firmware_artifacts tests.test_release_bundle tests.test_release_process
+          python -m unittest tests.test_audio_assets tests.test_sprite_firmware_assets tests.test_character_preview tests.test_device tests.test_firmware_artifacts tests.test_release_bundle tests.test_release_process
       - name: Set up Arduino CLI
         uses: arduino/setup-arduino-cli@81d310742121c928ea9c8bbd407b4217b432ae02 # v2.0.0
         with:

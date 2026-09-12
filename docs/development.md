@@ -108,7 +108,7 @@ The built-in flash sprites remain the reliable default. An optional card pack
 must be located at **`/copilot/sprite-firmware.bin`** and match the compiled
 payload's exact size and SHA256. This first version accepts the matching Copilot
 export, not arbitrary PNGs or additional character packs; a character catalog
-and the swipe-up settings menu are separate follow-up work.
+remains follow-up work.
 
 To prepare the card, copy the `copilot` folder from
 `build/sd-card/` to the card's root using a card reader. That staged folder
@@ -214,8 +214,10 @@ effects; the speed selector includes half and quarter speed for inspection.
 On the physical device, a tap is recognized only after release so a swipe cannot
 trigger Surprise first. A tapped Surprise returns to Idle after the spring,
 regardless of the previous persistent state. Explicit Surprise signals retain
-their existing resume behavior. Swipe up opens the settings menu for brightness
-and character-state selection; swipe down or tap Close to dismiss it.
+their existing resume behavior. Swipe up opens the settings menu for brightness,
+Off/Quiet/Normal sound, and character-state selection; swipe down or tap Close
+to dismiss it. Sound defaults to Quiet and is persisted in internal NVS, never
+on the microSD card.
 All four mode links are also prominently available on `/sprite-preview.html`.
 Transitions use shared-center artwork before switching tracks. The spring
 reaction settles forward to its neutral final frame rather than reversing the impact.
@@ -238,7 +240,7 @@ The latest explicit mode wins without cutting between different head sizes.
 Export rejects a surprise endpoint that is not the shared neutral, preventing
 the archived recoil track from being paired with the new one-way playback.
 
-Working adds eight miniature 4x7 cyan binary digits in four
+Working adds eight miniature 5x9 cyan binary digits in four
 lanes between the head and the physical top edge: two flowing inward and two
 outward. Digit identities stay stable in transit, with smooth fades near the
 head and offscreen recycling above the display. The four-second cycle wraps
@@ -250,6 +252,27 @@ The orbit uses equal 200-pixel radii (400-pixel diameter), replacing
 the 183 x 148-pixel oval radii. It leaves more room around the head and stays
 inside the display, including the full leading ball. Every Working pose retains
 more than twelve pixels between its nonblack artwork and the largest ball.
+
+## Audio cues
+
+Five original 24 kHz, 16-bit mono PCM cues live under `assets/audio/`.
+`tools/embed_audio.py` validates them and generates the application-flash arrays
+used by firmware. Working, Needs attention, Complete, and Surprise play once when
+the visible animation enters that mode; duplicate daemon reconciliation commands
+do not replay a cue. Settings actions use the short tick. There is no continuous
+Working loop.
+
+`AudioPlayer` runs on a separate low-priority task, duplicates mono samples into
+the ES8311 stereo I2S stream, and uses a one-item replacement queue so stale
+sounds cannot accumulate. The NS4150B amplifier on GPIO46 stays disabled between
+cues and whenever sound is Off. Codec or I2S initialization failures are logged
+without stopping animation. The checked-in ES8311 driver retains Espressif's
+Apache-2.0 SPDX headers and matches the driver in Waveshare's pinned example.
+
+The board routes audio through MCLK GPIO42, BCLK GPIO9, WS GPIO45, playback data
+GPIO8, and its two-pin speaker connector. A compatible external speaker is
+required when the board or enclosure does not include one. The audio path does
+not access the read-only microSD card.
 
 The character output spans 412 x 466 pixels at panel position (27, 0),
 giving the 400-pixel orbit room for the balls themselves. The original 400 x 352

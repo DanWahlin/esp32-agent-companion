@@ -18,7 +18,9 @@ built-in character.
 - **Natural motion:** smooth 30 FPS playback, eight looking directions, and occasional blinks.
 - **Touch reactions:** tap the character for a quick spring-like recoil and widened eyes,
   then return to Idle.
-- **On-device settings:** swipe up to adjust brightness or select a character state.
+- **On-device settings:** swipe up to adjust brightness, sound, or the character state.
+- **Subtle sound cues:** original local cues accompany Working, Needs attention, Complete,
+  Surprise, and settings actions when a speaker is attached.
 - **Agent states:** focused eyes and orbiting dots for Working, a celebration for Complete,
   and curious head tilts for Needs attention.
 - **Compact graphics:** lossless sprite compression preserves the artwork while keeping
@@ -128,9 +130,15 @@ whole-chip erase or modify your microSD card.
 
 When flashing finishes, the device restarts and the character begins looking
 around. Tap it to try the touch reaction; it returns to Idle when the spring
-finishes. Swipe up to open settings. The menu
-adjusts display brightness and selects Idle, Surprise, Working, Complete, or
-Needs attention. Swipe down or tap Close to return to the character.
+finishes. Swipe up to open settings. The menu adjusts display brightness, selects
+Off, Quiet, or Normal sound, and chooses Idle, Surprise, Working, Complete, or
+Needs attention. Quiet is the default and the sound choice persists across
+restarts. Swipe down or tap Close to return to the character.
+
+Sound uses the board's ES8311 codec and two-pin speaker output. Connect a compatible
+speaker to the board's speaker connector if your device or enclosure does not
+include one. Audio stays local to the device and is not read from or written to
+the microSD card.
 
 If the device is not listed, check that the cable supports data. For connection or
 download-mode problems, see the [Waveshare instructions](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75).
