@@ -9,8 +9,9 @@ GitHub Copilot and comes to life on a round AMOLED touchscreen: it looks around,
 blinks, reacts when tapped, and can display Working, Complete, and Needs attention
 states.
 
-It runs locally on the **Waveshare ESP32-S3-Touch-AMOLED-1.75-B**. No Wi-Fi,
-cloud account, subscription, or microSD card is needed to run the built-in character.
+It runs locally on the **Waveshare ESP32-S3-Touch-AMOLED-1.75-B or 1.75-C**.
+No Wi-Fi, cloud account, subscription, or microSD card is needed to run the
+built-in character.
 
 ## What it does
 
@@ -37,7 +38,7 @@ additional characters, and a swipe-up settings menu are not implemented yet**.
 
 You need:
 
-- **Waveshare ESP32-S3-Touch-AMOLED-1.75-B:** [Buy from Waveshare](https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm?sku=31262)
+- **Waveshare ESP32-S3-Touch-AMOLED-1.75-B or 1.75-C:** [Buy from Waveshare](https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm?sku=31262)
   or [Amazon](https://www.amazon.com/dp/B0FBWDL117).
 - A **USB data cable** and a macOS, Windows, or Linux computer.
 - **[Python 3.10 or newer](https://www.python.org/downloads/)**. On Windows, include
