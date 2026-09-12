@@ -2,11 +2,12 @@
   <img src="images/logo.png" alt="A thin round ESP32 display with a friendly face and microcontroller graphic" width="400">
 </p>
 
-# ESP32 Copilot
+# ESP32 Agent Companion
 
-A small, expressive companion for your desk. Bring a GitHub Copilot-inspired
-character to life on a round AMOLED touchscreen: it looks around, blinks, reacts
-when tapped, and shows when an agent is working, finished, or needs attention.
+A small, expressive companion for your desk. Its first character is inspired by
+GitHub Copilot and comes to life on a round AMOLED touchscreen: it looks around,
+blinks, reacts when tapped, and can display Working, Complete, and Needs attention
+states.
 
 It runs locally on the **Waveshare ESP32-S3-Touch-AMOLED-1.75-B**. No Wi-Fi,
 cloud account, subscription, or microSD card is needed to run the built-in character.
@@ -38,11 +39,11 @@ You need:
 - **[Python 3.10 or newer](https://www.python.org/downloads/)**. On Windows, include
   the Python launcher when installing.
 
-From [Releases](https://github.com/DanWahlin/esp32-copilot/releases/latest), download
+From [Releases](https://github.com/DanWahlin/esp32-agent-companion/releases/latest), download
 the file ending in **`-firmware.zip`** and extract it. You do **not** need Arduino IDE,
 Arduino CLI, or the source repository to install a release.
 
-If no release downloads are available yet, use the [source-build guide](docs/build-from-source.md).
+Prefer to build it yourself? Follow the [source-build guide](docs/build-from-source.md).
 
 ### 2. Install the flashing software
 
