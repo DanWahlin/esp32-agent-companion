@@ -223,21 +223,29 @@ void drawSettingsButton(int x, int y, int width, const char* label, bool selecte
   display.print(label);
 }
 
+void drawSettingsTitle(uint16_t color) {
+  constexpr char title[] = "Settings";
+  constexpr int y[] = {62, 53, 47, 44, 44, 47, 53, 62};
+  display.setTextColor(color);
+  display.setTextSize(3);
+  for (unsigned i = 0; i < sizeof(title) - 1; ++i) {
+    display.setCursor(153 + static_cast<int>(i) * 20, y[i]);
+    display.print(title[i]);
+  }
+}
+
 void drawSettingsMenu(CharacterMode selected) {
   constexpr uint16_t background = 0x0842;
   constexpr uint16_t panel = 0x10A5;
   constexpr uint16_t text = 0xE73F;
   constexpr uint16_t muted = 0x8C71;
   display.fillScreen(0);
-  display.fillRoundRect(38, 28, 390, 376, 28, panel);
-  display.drawRoundRect(38, 28, 390, 376, 28, 0x31CC);
-  display.setTextColor(text);
-  display.setTextSize(3);
-  display.setCursor(58, 52);
-  display.print("Settings");
+  drawSettingsTitle(text);
+  display.fillRoundRect(38, 92, 390, 312, 28, panel);
+  display.drawRoundRect(38, 92, 390, 312, 28, 0x31CC);
   display.setTextColor(muted);
   display.setTextSize(1);
-  display.setCursor(59, 86);
+  display.setCursor(131, 92);
   display.print("Swipe down or tap Close to return");
   display.setTextColor(text);
   display.setTextSize(2);
