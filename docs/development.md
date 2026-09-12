@@ -183,7 +183,10 @@ expire immediately after it finishes. Expired leases return the aggregate to the
 next valid state instead of leaving the display stuck after a crashed CLI. Hook
 timestamps reject delayed main-agent or subagent events. Complete is
 intentionally not recovered after a restart, preventing an old celebration from
-replaying when the device reconnects.
+replaying when the device reconnects. Subagent starts that provide only a shared
+name are correlated with stops that later add a unique agent ID; stop events are
+resolved against their parent lease, and legacy name-only leases are discarded
+on restart so completed task agents cannot leave the display stuck in Working.
 
 ### Character Lab
 

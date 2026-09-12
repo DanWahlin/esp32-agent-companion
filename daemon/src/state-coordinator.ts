@@ -79,7 +79,24 @@ export class StateCoordinator {
   handle(event: HookEvent, payload: HookPayload): boolean {
     const now = this.#now();
     const occurredAt = this.#eventTime(payload, now);
-    const sessionId = this.#sessionId(payload);
+    let sessionId = event === 'subagentStart' || event === 'subagentStop'
+      ? this.#parentSessionId(payload) ?? this.#sessionId(payload)
+      : this.#sessionId(payload);
+    let agentIdentity = event === 'subagentStart' || event === 'subagentStop'
+      ? this.#agentIdentity(payload)
+      : undefined;
+    if (event === 'subagentStop' && !this.#parentSessionId(payload) && agentIdentity) {
+      let owner = this.#subagentOwner(agentIdentity.id);
+      if (!owner) {
+        const namedIdentity = this.#namedAgentIdentity(payload);
+        const namedOwner = namedIdentity ? this.#subagentOwner(namedIdentity.id) : undefined;
+        if (namedIdentity && namedOwner) {
+          agentIdentity = namedIdentity;
+          owner = namedOwner;
+        }
+      }
+      sessionId = owner?.id ?? sessionId;
+    }
     if (event === 'sessionEnd') {
       const session = this.#sessions.get(sessionId);
       if (session && occurredAt < session.lastMainEventAt) return false;
@@ -89,7 +106,7 @@ export class StateCoordinator {
     }
     const session = this.#session(sessionId, now);
     if (event === 'subagentStart' || event === 'subagentStop') {
-      const {id: agentId, counted} = this.#agentIdentity(payload);
+      const {id: agentId, counted} = agentIdentity!;
       const existing = session.subagents.get(agentId);
       if (existing && occurredAt < existing.lastEventAt) return false;
       if (event === 'subagentStart') {
@@ -202,14 +219,18 @@ export class StateCoordinator {
 
   #restore(restored: PersistedCoordinatorState | undefined): void {
     if (!restored || restored.version !== 1) return;
+    let sanitized = false;
     for (const saved of restored.sessions) {
       if (!saved.id || !Number.isFinite(saved.lastSeenAt)) continue;
+      const subagents = saved.subagents.filter(agent => !agent.id.startsWith('name:'));
+      sanitized ||= subagents.length !== saved.subagents.length;
       this.#sessions.set(saved.id, {
         ...saved,
         completionPending: false,
-        subagents: new Map(saved.subagents.map(agent => [agent.id, {...agent}])),
+        subagents: new Map(subagents.map(agent => [agent.id, {...agent}])),
       });
     }
+    if (sanitized) this.#onMutation?.(this.snapshot());
   }
 
   #session(id: string, now: number): SessionState {
@@ -235,16 +256,39 @@ export class StateCoordinator {
     return typeof value === 'string' && value ? value : 'unknown-session';
   }
 
+  #parentSessionId(payload: HookPayload): string | undefined {
+    const value = payload.parentSessionId ?? payload.parent_session_id;
+    return typeof value === 'string' && value ? value : undefined;
+  }
+
   #agentIdentity(payload: HookPayload): {id: string; counted: boolean} {
-    const unique = payload.agentId ?? payload.agent_id;
+    const unique = payload.subagentId ?? payload.subagent_id
+      ?? payload.agentId ?? payload.agent_id;
     if (typeof unique === 'string' && unique) return {id: `id:${unique}`, counted: false};
     const toolCall = payload.toolCallId ?? payload.tool_call_id;
     if (typeof toolCall === 'string' && toolCall) return {id: `call:${toolCall}`, counted: false};
+    return this.#namedAgentIdentity(payload) ?? {id: 'name:unknown-agent', counted: true};
+  }
+
+  #namedAgentIdentity(payload: HookPayload): {id: string; counted: true} | undefined {
     const name = payload.agentName ?? payload.agent_name;
+    if (typeof name !== 'string' || !name) return undefined;
     return {
-      id: `name:${typeof name === 'string' && name ? name : 'unknown-agent'}`,
+      id: `name:${name}`,
       counted: true,
     };
+  }
+
+  #subagentOwner(agentId: string): SessionState | undefined {
+    let owner: SessionState | undefined;
+    let latest = -1;
+    for (const session of this.#sessions.values()) {
+      const agent = session.subagents.get(agentId);
+      if (!agent || agent.lastEventAt <= latest) continue;
+      owner = session;
+      latest = agent.lastEventAt;
+    }
+    return owner;
   }
 
   #eventTime(payload: HookPayload, fallback: number): number {

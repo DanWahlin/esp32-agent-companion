@@ -19,6 +19,10 @@ export type HookEvent = typeof hookEvents[number];
 export interface HookPayload {
   sessionId?: string;
   session_id?: string;
+  parentSessionId?: string;
+  parent_session_id?: string;
+  subagentId?: string;
+  subagent_id?: string;
   agentId?: string;
   agent_id?: string;
   agentName?: string;

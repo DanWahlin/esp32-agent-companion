@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import {setTimeout as delay} from 'node:timers/promises';
 import test from 'node:test';
-import {StateCoordinator, type StateCoordinatorOptions} from '../src/state-coordinator.js';
+import {
+  StateCoordinator,
+  type PersistedCoordinatorState,
+  type StateCoordinatorOptions,
+} from '../src/state-coordinator.js';
 import type {CharacterState, HookPayload} from '../src/protocol.js';
 
 function fixture(overrides: StateCoordinatorOptions = {}) {
@@ -65,6 +69,49 @@ test('counts simultaneous subagents when hooks provide only a shared name', () =
   assert.equal(coordinator.state, 'working');
   coordinator.handle('subagentStop', payload('one', {agentName: 'task'}));
   assert.equal(coordinator.state, 'idle');
+  coordinator.close();
+});
+
+test('matches subagent lifecycle through parent session and subagent IDs', () => {
+  const {coordinator, payload} = fixture();
+  coordinator.handle('userPromptSubmitted', payload('parent'));
+  coordinator.handle('preToolUse', payload('parent'));
+  coordinator.handle('subagentStart', payload('child-session', {
+    parentSessionId: 'parent',
+    subagentId: 'child-one',
+    agentName: 'task',
+  }));
+  coordinator.handle('agentStop', payload('parent'));
+  assert.equal(coordinator.state, 'working');
+  coordinator.handle('subagentStop', payload('child-session', {
+    parentSessionId: 'parent',
+    subagentId: 'child-one',
+    agentName: 'task',
+  }));
+  assert.equal(coordinator.state, 'complete');
+  coordinator.close();
+});
+
+test('matches name-only subagent stops arriving under child sessions', () => {
+  const {coordinator, payload} = fixture();
+  coordinator.handle('subagentStart', payload('parent', {agentName: 'task'}));
+  assert.equal(coordinator.sessionCount, 1);
+  coordinator.handle('subagentStop', payload('child-session', {agentName: 'task'}));
+  assert.equal(coordinator.state, 'idle');
+  assert.equal(coordinator.sessionCount, 1);
+  assert.equal(coordinator.snapshot().sessions[0]?.subagents.length, 0);
+  coordinator.close();
+});
+
+test('falls back to agent name when only stop has a unique ID', () => {
+  const {coordinator, payload} = fixture();
+  coordinator.handle('subagentStart', payload('parent', {agentName: 'task'}));
+  coordinator.handle('subagentStop', payload('parent', {
+    agentId: 'child-one',
+    agentName: 'task',
+  }));
+  assert.equal(coordinator.state, 'idle');
+  assert.equal(coordinator.snapshot().sessions[0]?.subagents.length, 0);
   coordinator.close();
 });
 
@@ -160,6 +207,35 @@ test('restores only unexpired leases and never replays Complete', () => {
   assert.equal(coordinator.state, 'working');
   assert.deepEqual(states, ['working']);
   assert.equal(coordinator.snapshot().sessions[0]?.completionPending, false);
+  coordinator.close();
+});
+
+test('drops legacy name-only subagent leases during restore', () => {
+  let persisted: PersistedCoordinatorState | undefined;
+  const {coordinator} = fixture({
+    onMutation: state => { persisted = state; },
+    restored: {
+      version: 1,
+      sessions: [{
+        id: 'one',
+        activeUntil: 0,
+        attentionUntil: 0,
+        lastMainEventAt: 900,
+        lastSeenAt: 900,
+        hadWork: true,
+        completionPending: false,
+        subagents: [{
+          id: 'name:task',
+          instances: 13,
+          leaseUntil: 999_999,
+          lastEventAt: 900,
+        }],
+      }],
+    },
+  });
+  assert.equal(coordinator.state, 'idle');
+  assert.equal(coordinator.snapshot().sessions[0]?.subagents.length, 0);
+  assert.equal(persisted?.sessions[0]?.subagents.length, 0);
   coordinator.close();
 });
 
