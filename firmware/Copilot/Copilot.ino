@@ -310,50 +310,50 @@ void drawSettingsMenu(CharacterMode selected) {
   drawSettingsTitle(text);
   display.fillRoundRect(38, 92, 390, 312, 28, panel);
   display.drawRoundRect(38, 92, 390, 312, 28, 0x31CC);
-  display.setTextColor(muted);
-  display.setTextSize(1);
-  display.setCursor(203, 99);
+  display.setTextColor(text);
+  display.setTextSize(2);
+  display.setCursor(173, 96);
   display.print("Brightness");
-  drawSettingsButton(150, 108, 48, "-", false, 3, 38);
-  drawSettingsButton(268, 108, 48, "+", false, 3, 38);
-  display.fillRoundRect(204, 108, 58, 38, 10, background);
+  drawSettingsButton(150, 116, 48, "-", false, 3, 38);
+  drawSettingsButton(268, 116, 48, "+", false, 3, 38);
+  display.fillRoundRect(204, 116, 58, 38, 10, background);
   display.setTextColor(text);
   display.setTextSize(2);
   char brightness[8];
   snprintf(brightness, sizeof(brightness), "%u%%",
            static_cast<unsigned>((settings.brightness() * 100 + 127) / 255));
-  display.setCursor(211, 119);
+  display.setCursor(211, 127);
   display.print(brightness);
-  display.setTextColor(muted);
-  display.setTextSize(1);
-  display.setCursor(218, 151);
-  display.print("Sound");
-  drawSettingsButton(150, 162, 48, "-", false, 3, 38);
-  drawSettingsButton(268, 162, 48, "+", false, 3, 38);
-  display.fillRoundRect(204, 162, 58, 38, 10, background);
+  display.setTextColor(text);
+  display.setTextSize(2);
+  display.setCursor(197, 160);
+  display.print("Volume");
+  drawSettingsButton(150, 180, 48, "-", false, 3, 38);
+  drawSettingsButton(268, 180, 48, "+", false, 3, 38);
+  display.fillRoundRect(204, 180, 58, 38, 10, background);
   display.setTextColor(text);
   display.setTextSize(2);
   char volume[8];
   if (settings.soundVolume() == 0) {
     snprintf(volume, sizeof(volume), "Off");
-    display.setCursor(215, 173);
+    display.setCursor(215, 191);
   } else {
     snprintf(volume, sizeof(volume), "%u%%",
              static_cast<unsigned>(settings.soundVolume()));
-    display.setCursor(211, 173);
+    display.setCursor(211, 191);
   }
   display.print(volume);
   display.setTextColor(text);
   display.setTextSize(2);
-  display.setCursor(58, 207);
+  display.setCursor(143, 222);
   display.print("Character state");
-  drawSettingsButton(58, 230, 165, "Idle", selected == CharacterMode::Idle, 2, 42);
-  drawSettingsButton(243, 230, 165, "Working", selected == CharacterMode::Working, 2, 42);
-  drawSettingsButton(58, 282, 165, "Complete", selected == CharacterMode::Complete, 2, 42);
-  drawSettingsButton(243, 282, 165, "Needs attention",
-                     selected == CharacterMode::Attention, 1, 42);
-  drawSettingsButton(58, 334, 165, "Surprise", selected == CharacterMode::Surprise, 2, 42);
-  drawSettingsButton(243, 334, 165, "Close", false, 2, 42);
+  drawSettingsButton(58, 244, 165, "Idle", selected == CharacterMode::Idle, 2, 40);
+  drawSettingsButton(243, 244, 165, "Working", selected == CharacterMode::Working, 2, 40);
+  drawSettingsButton(58, 292, 165, "Complete", selected == CharacterMode::Complete, 2, 40);
+  drawSettingsButton(243, 292, 165, "Needs attention",
+                     selected == CharacterMode::Attention, 1, 40);
+  drawSettingsButton(58, 340, 165, "Surprise", selected == CharacterMode::Surprise, 2, 40);
+  drawSettingsButton(243, 340, 165, "Close", false, 2, 40);
 }
 
 void clearCharacterMargins() {

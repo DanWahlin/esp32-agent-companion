@@ -32,28 +32,28 @@ class SettingsMenu {
 
   SettingsAction tap(int16_t x, int16_t y) {
     if (!open_) return SettingsAction::None;
-    if (inside(x, y, 150, 108, 48, 38)) {
+    if (inside(x, y, 150, 116, 48, 38)) {
       brightness_ = brightness_ > 55 ? brightness_ - 25 : 30;
       return SettingsAction::BrightnessDown;
     }
-    if (inside(x, y, 268, 108, 48, 38)) {
+    if (inside(x, y, 268, 116, 48, 38)) {
       brightness_ = brightness_ < 230 ? brightness_ + 25 : 255;
       return SettingsAction::BrightnessUp;
     }
-    if (inside(x, y, 150, 162, 48, 38)) {
+    if (inside(x, y, 150, 180, 48, 38)) {
       soundVolume_ = soundVolume_ > 25 ? soundVolume_ - 25 : 0;
       return SettingsAction::SoundDown;
     }
-    if (inside(x, y, 268, 162, 48, 38)) {
+    if (inside(x, y, 268, 180, 48, 38)) {
       soundVolume_ = soundVolume_ < 75 ? soundVolume_ + 25 : 100;
       return SettingsAction::SoundUp;
     }
-    if (inside(x, y, 58, 230, 165, 42)) return SettingsAction::Idle;
-    if (inside(x, y, 243, 230, 165, 42)) return SettingsAction::Working;
-    if (inside(x, y, 58, 282, 165, 42)) return SettingsAction::Complete;
-    if (inside(x, y, 243, 282, 165, 42)) return SettingsAction::Attention;
-    if (inside(x, y, 58, 334, 165, 42)) return SettingsAction::Surprise;
-    if (inside(x, y, 243, 334, 165, 42)) return SettingsAction::Close;
+    if (inside(x, y, 58, 244, 165, 40)) return SettingsAction::Idle;
+    if (inside(x, y, 243, 244, 165, 40)) return SettingsAction::Working;
+    if (inside(x, y, 58, 292, 165, 40)) return SettingsAction::Complete;
+    if (inside(x, y, 243, 292, 165, 40)) return SettingsAction::Attention;
+    if (inside(x, y, 58, 340, 165, 40)) return SettingsAction::Surprise;
+    if (inside(x, y, 243, 340, 165, 40)) return SettingsAction::Close;
     return SettingsAction::None;
   }
 
