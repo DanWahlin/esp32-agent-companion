@@ -15,6 +15,7 @@
 #include "src/CharacterEffects.h"
 #include "src/DeviceCommands.h"
 #include "src/TouchInput.h"
+#include "src/SettingsMenu.h"
 #include "src/Motion.h"
 
 using namespace copilot;
@@ -35,6 +36,7 @@ uint8_t* transferBuffer;
 std::atomic<uint32_t> droppedLogs{0};
 uint32_t worstPresentationGap = 0;
 bool captureInterrupted = false;
+SettingsMenu settings(kBrightness);
 
 void logMessage(const char* format, ...) {
   char message[384];
@@ -205,6 +207,119 @@ void queueMode(DeviceCommand command) {
   logMessage("COMMAND accepted=%s\n", commandName(command));
 }
 
+void drawSettingsButton(int x, int y, int width, const char* label, bool selected,
+                        uint8_t textSize = 2) {
+  constexpr uint16_t border = 0x5D19;
+  constexpr uint16_t normal = 0x18E7;
+  constexpr uint16_t active = 0x2372;
+  constexpr uint16_t text = 0xE73F;
+  display.fillRoundRect(x, y, width, 48, 10, selected ? active : normal);
+  display.drawRoundRect(x, y, width, 48, 10, selected ? 0x867F : border);
+  display.setTextColor(text);
+  display.setTextSize(textSize);
+  const int characterWidth = 6 * textSize;
+  display.setCursor(x + std::max(10, (width - static_cast<int>(std::strlen(label)) * characterWidth) / 2),
+                    y + (48 - 8 * textSize) / 2);
+  display.print(label);
+}
+
+void drawSettingsMenu(CharacterMode selected) {
+  constexpr uint16_t background = 0x0842;
+  constexpr uint16_t panel = 0x10A5;
+  constexpr uint16_t text = 0xE73F;
+  constexpr uint16_t muted = 0x8C71;
+  display.fillScreen(0);
+  display.fillRoundRect(38, 28, 390, 376, 28, panel);
+  display.drawRoundRect(38, 28, 390, 376, 28, 0x31CC);
+  display.setTextColor(text);
+  display.setTextSize(3);
+  display.setCursor(58, 52);
+  display.print("Settings");
+  display.setTextColor(muted);
+  display.setTextSize(1);
+  display.setCursor(59, 86);
+  display.print("Swipe down or tap Close to return");
+  display.setTextColor(text);
+  display.setTextSize(2);
+  display.setCursor(58, 105);
+  display.print("Brightness");
+  drawSettingsButton(58, 126, 90, "-", false, 3);
+  drawSettingsButton(318, 126, 90, "+", false, 3);
+  display.fillRoundRect(166, 126, 134, 48, 10, background);
+  display.setTextColor(text);
+  display.setTextSize(2);
+  char brightness[8];
+  snprintf(brightness, sizeof(brightness), "%u%%",
+           static_cast<unsigned>((settings.brightness() * 100 + 127) / 255));
+  display.setCursor(201, 142);
+  display.print(brightness);
+  display.setCursor(58, 190);
+  display.print("Character state");
+  drawSettingsButton(58, 214, 165, "Idle", selected == CharacterMode::Idle);
+  drawSettingsButton(243, 214, 165, "Working", selected == CharacterMode::Working);
+  drawSettingsButton(58, 274, 165, "Complete", selected == CharacterMode::Complete);
+  drawSettingsButton(243, 274, 165, "Needs attention",
+                     selected == CharacterMode::Attention, 1);
+  drawSettingsButton(58, 334, 165, "Surprise", selected == CharacterMode::Surprise);
+  drawSettingsButton(243, 334, 165, "Close", false);
+}
+
+void clearCharacterMargins() {
+  display.fillRect(0, 0, kCharacterFrameX, kDisplaySize, 0);
+  display.fillRect(kCharacterFrameX + kCharacterFrameWidth, 0,
+                   kDisplaySize - kCharacterFrameX - kCharacterFrameWidth, kDisplaySize, 0);
+}
+
+void handleTouchGesture(const TouchGesture& gesture, const Frame& frame) {
+  if (gesture.kind == TouchGestureKind::SwipeUp && !settings.isOpen()) {
+    settings.open();
+    drawSettingsMenu(frame.state.requestedMode);
+    logMessage("SETTINGS opened\n");
+    return;
+  }
+  if (gesture.kind == TouchGestureKind::SwipeDown && settings.isOpen()) {
+    settings.close();
+    clearCharacterMargins();
+    logMessage("SETTINGS closed=swipe\n");
+    return;
+  }
+  if (gesture.kind != TouchGestureKind::Tap) return;
+  if (!settings.isOpen()) {
+    const int x = gesture.endX - kCharacterFrameX, y = gesture.endY;
+    if (x >= 0 && y >= 0 && x < kCharacterFrameWidth && y < kCharacterFrameHeight
+        && frame.pixels[y * kCharacterFrameWidth + x] != 0) {
+      logMessage("TOUCH tap x=%d y=%d\n", gesture.endX, gesture.endY);
+      queueMode(DeviceCommand::Surprise);
+    }
+    return;
+  }
+  const SettingsAction action = settings.tap(gesture.endX, gesture.endY);
+  switch (action) {
+    case SettingsAction::BrightnessDown:
+    case SettingsAction::BrightnessUp:
+      display.setBrightness(settings.brightness());
+      drawSettingsMenu(frame.state.requestedMode);
+      logMessage("SETTINGS brightness=%u\n", static_cast<unsigned>(settings.brightness()));
+      break;
+    case SettingsAction::Idle:
+      settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Idle); break;
+    case SettingsAction::Surprise:
+      settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Surprise); break;
+    case SettingsAction::Working:
+      settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Working); break;
+    case SettingsAction::Complete:
+      settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Complete); break;
+    case SettingsAction::Attention:
+      settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Attention); break;
+    case SettingsAction::Close:
+      settings.close();
+      clearCharacterMargins();
+      logMessage("SETTINGS closed=button\n");
+      break;
+    case SettingsAction::None: break;
+  }
+}
+
 void logSdStatus(const SdSpriteStatus& status) {
   logMessage("SD state=%s card=%s capacity_bytes=%llu cache_bytes=%u hits=%u misses=%u\n",
              status.state, status.cardType, static_cast<unsigned long long>(status.capacityBytes),
@@ -314,30 +429,26 @@ void loop() {
     worstPresentationGap = std::max(worstPresentationGap, gap);
   }
   previousPresentation = start;
-  display.startWrite();
-  display.writeAddrWindow(kCharacterFrameX, 0, kCharacterFrameWidth, kCharacterFrameHeight);
-  const auto* bytes = reinterpret_cast<const uint8_t*>(frame->pixels);
-  constexpr size_t frameBytes = kCharacterFrameWidth * kCharacterFrameHeight * 2;
-  for (size_t offset = 0; offset < frameBytes; offset += kTransferBytes) {
-    const size_t count = std::min(kTransferBytes, frameBytes - offset);
-    std::memcpy(transferBuffer, bytes + offset, count);
-    displayBus.writeBytes(transferBuffer, count);
+  uint32_t transferUs = 0;
+  if (!settings.isOpen()) {
+    display.startWrite();
+    display.writeAddrWindow(kCharacterFrameX, 0, kCharacterFrameWidth, kCharacterFrameHeight);
+    const auto* bytes = reinterpret_cast<const uint8_t*>(frame->pixels);
+    constexpr size_t frameBytes = kCharacterFrameWidth * kCharacterFrameHeight * 2;
+    for (size_t offset = 0; offset < frameBytes; offset += kTransferBytes) {
+      const size_t count = std::min(kTransferBytes, frameBytes - offset);
+      std::memcpy(transferBuffer, bytes + offset, count);
+      displayBus.writeBytes(transferBuffer, count);
+    }
+    display.endWrite();
+    transferUs = esp_timer_get_time() - start;
   }
-  display.endWrite();
-  const uint32_t transferUs = esp_timer_get_time() - start;
   if (fadeFrame <= 40) {
-    display.setBrightness(static_cast<uint8_t>(kBrightness * smoother(fadeFrame / 40.0f)));
+    display.setBrightness(static_cast<uint8_t>(settings.brightness() * smoother(fadeFrame / 40.0f)));
     ++fadeFrame;
   }
-  TouchTap tap;
-  if (pollTouchTap(tap)) {
-    const int x = tap.x - kCharacterFrameX, y = tap.y;
-    if (x >= 0 && y >= 0 && x < kCharacterFrameWidth && y < kCharacterFrameHeight
-        && frame->pixels[y * kCharacterFrameWidth + x] != 0) {
-      logMessage("TOUCH x=%d y=%d\n", tap.x, tap.y);
-      queueMode(DeviceCommand::Surprise);
-    }
-  }
+  TouchGesture gesture;
+  if (pollTouchGesture(gesture)) handleTouchGesture(gesture, *frame);
   if (touchInputError()) fatal(touchInputError());
   processCommand(commandParser.expire(esp_timer_get_time() / 1000), *frame);
   for (unsigned read = 0; read < 8 && Serial.available(); ++read) {

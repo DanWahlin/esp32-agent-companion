@@ -11,7 +11,7 @@ namespace {
 const char* error = nullptr;
 #ifdef ARDUINO_ARCH_ESP32
 TouchDrvCST92xx controller;
-TouchDebounce debounce;
+TouchGestureTracker tracker;
 portMUX_TYPE touchLock = portMUX_INITIALIZER_UNLOCKED;
 volatile bool pending = false;
 bool initialized = false;
@@ -52,7 +52,7 @@ bool initializeTouchInput() {
 #endif
 }
 
-bool pollTouchTap(TouchTap& tap) {
+bool pollTouchGesture(TouchGesture& gesture) {
 #ifdef ARDUINO_ARCH_ESP32
   if (!initialized) {
     error = "Touch input was not initialized.";
@@ -62,14 +62,12 @@ bool pollTouchTap(TouchTap& tap) {
   const bool ready = pending;
   pending = false;
   portEXIT_CRITICAL(&touchLock);
-  if (!ready) return false;
+  if (!ready && !tracker.active()) return false;
   int16_t x[2] = {}, y[2] = {};
   const uint8_t count = controller.getPoint(x, y, 2);
-  if (!debounce.sample(count != 0, esp_timer_get_time() / 1000)) return false;
-  tap = {x[0], y[0]};
-  return true;
+  return tracker.sample(count != 0, x[0], y[0], esp_timer_get_time() / 1000, gesture);
 #else
-  (void)tap;
+  (void)gesture;
   error = "Physical touch input requires the ESP32 device.";
   return false;
 #endif

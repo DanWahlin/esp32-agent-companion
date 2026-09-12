@@ -17,6 +17,7 @@ built-in character.
 
 - **Natural motion:** smooth 30 FPS playback, eight looking directions, and occasional blinks.
 - **Touch reactions:** tap the character for a quick spring-like recoil and widened eyes.
+- **On-device settings:** swipe up to adjust brightness or select a character state.
 - **Agent states:** focused eyes and orbiting dots for Working, a celebration for Complete,
   and curious head tilts for Needs attention.
 - **Compact graphics:** lossless sprite compression preserves the artwork while keeping
@@ -25,8 +26,8 @@ built-in character.
   flash assets as the fallback.
 
 The character works immediately in automatic Idle mode. Agent states can be
-controlled through USB serial commands; **automatic integration with coding agents,
-additional characters, and a swipe-up settings menu are not implemented yet**.
+controlled through USB serial commands or the swipe-up settings menu. **Automatic
+integration with coding agents and additional characters are not implemented yet**.
 
 <p align="center">
   <img src="preview/agent-companion-demo.gif" alt="ESP32 Agent Companion cycling through Idle, Surprise, Working, Needs attention, and Complete states" width="400">
@@ -104,7 +105,9 @@ anything needed from its previous firmware first. The installer does not run a
 whole-chip erase or modify your microSD card.
 
 When flashing finishes, the device restarts and the character begins looking
-around. Tap it to try the touch reaction.
+around. Tap it to try the touch reaction, or swipe up to open settings. The menu
+adjusts display brightness and selects Idle, Surprise, Working, Complete, or
+Needs attention. Swipe down or tap Close to return to the character.
 
 If the device is not listed, check that the cable supports data. For connection or
 download-mode problems, see the [Waveshare instructions](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75).
