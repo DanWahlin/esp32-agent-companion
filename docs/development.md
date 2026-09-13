@@ -11,12 +11,13 @@ A quietly expressive desktop companion for the **Waveshare
 ESP32-S3-Touch-AMOLED-1.75-B**: the supplied blue/violet Copilot artwork, deep
 directional head turns, relaxed pauses,
 and occasional asymmetric-timed blinks and double blinks. No scrolling text,
-UI chrome, Wi-Fi, cloud service, speaker, or microSD card is required.
+UI chrome, Wi-Fi, cloud service, or microSD card is required. Sound cues require
+a compatible speaker, but all visual behavior works without one.
 
 ## Run on this Mac
 
 ```bash
-cd ~/Desktop/projects/esp32-copilot
+cd ~/Desktop/projects/esp32-agent-companion
 bash tools/arduino.sh build
 bash tools/arduino.sh upload /dev/cu.usbmodem2101
 ```
@@ -164,12 +165,15 @@ when the last active task finishes.
 cd daemon
 npm install
 npm test
-npm run install:macos
+npm run install:daemon
 npm run status
 ```
 
-The installer writes `~/.copilot/hooks/agent-companion.json` and a
-`launchd` user agent. Hook failures are intentionally ignored so a missing daemon
+The installer writes `~/.copilot/hooks/agent-companion.json` and either a macOS
+LaunchAgent or Linux systemd user service. On Windows, run both Copilot CLI and
+the daemon inside the same WSL distribution, with systemd enabled and the ESP32
+USB serial device attached to WSL; native Windows service installation is not
+currently supported. Hook failures are intentionally ignored so a missing daemon
 or disconnected device never blocks Copilot. Restart Copilot CLI after changing
 hook configuration. The daemon only transmits lifecycle state and session IDs;
 it does not send prompts, responses, source code, or tool arguments to the ESP32.
@@ -200,9 +204,10 @@ instead of the long double-take. It briefly gets smaller while widening its eyes
 rebounds slightly, and settles in about 0.8 seconds once centered. Working has a
 400 x 400 circular orbit, slow glances, and binary digits flowing through the top
 edge; the three bottom activity dots are removed. Alternating attention tilts
-remain unchanged. The device and native web preview use the same implementation.
-This revision, including lossless storage optimization, is flashed locally but
-has not yet been committed or pushed.
+remain unchanged. After two uninterrupted Idle minutes, Sleeping centers the
+character, adds subtle side movement, slowly peeks through drowsy eyelids, and
+alternates rising Zs between both sides for one minute. The device and native web
+preview use the same implementation.
 
 | Signal | Visual behavior | Duration |
 | --- | --- | --- |
@@ -210,9 +215,10 @@ has not yet been committed or pushed.
 | Working | Normal-to-focused eyes, slow randomized side glances, tiny bidirectional binary streams and cyan orbit | Until another signal arrives |
 | Complete | Happy crescent eyes, rising fireworks and falling confetti | One celebration, then idle |
 | Needs attention | Alternating large/small eyes and slow questioning head tilts, with a breathing amber question badge | Until explicitly changed; a surprise does not dismiss it |
+| Sleeping | Closed, slowly peeking eyelids, shallow side movement, and alternating rising Zs | Automatically after two Idle minutes; sleeps for one minute, then repeats |
 
 Click/tap the character, or focus it and press Enter/Space, to trigger surprise.
-Keys 1-5 select the five modes including idle. Pause freezes both expression and
+Keys 1-6 select the six modes including Idle and Sleeping. Pause freezes both expression and
 effects; the speed selector includes half and quarter speed for inspection.
 On the physical device, a tap is recognized only after release so a swipe cannot
 trigger Surprise first. A tapped Surprise returns to Idle after the spring,
@@ -221,7 +227,7 @@ their existing resume behavior. Swipe up opens the settings menu for brightness,
 0-100% sound volume, and character-state selection; swipe down or tap Close to
 dismiss it. Sound defaults to 50% and is persisted in internal NVS, never on the
 microSD card.
-All four mode links are also prominently available on `/sprite-preview.html`.
+All five non-Idle mode links are also available on `/sprite-preview.html`.
 Transitions use shared-center artwork before switching tracks. The spring
 reaction settles forward to its neutral final frame rather than reversing the impact.
 Working stays visibly active during its slow, partial-depth side glances, then
@@ -597,7 +603,8 @@ panel appearance must also be checked after uploading. The driver does not
 synchronize to panel TE, so software buffering is not a guarantee of tear-free
 physical scanout.
 
-The current compact lossless version completed a five-minute mixed-mode run:
+The compact lossless build immediately before Sleeping was added completed a
+five-minute mixed-mode run:
 all 60 reports were **30.0 fps**, with a maximum normal presentation interval
 of **33.346 ms**, also the lifetime maximum at the final check. All five modes,
 both attention tilts, and a Working side glance were observed. All 60 memory

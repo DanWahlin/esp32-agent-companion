@@ -35,6 +35,10 @@ CharacterState working(float seconds, uint8_t direction = 9, uint8_t index = 23)
   return {{direction, index, 0}, CharacterMode::Working, CharacterMode::Working, seconds, 42};
 }
 
+CharacterState sleeping(float seconds) {
+  return {{0, 0, 4}, CharacterMode::Sleep, CharacterMode::Sleep, seconds, 42};
+}
+
 void draw(CharacterEffects& effects, CharacterState state, uint16_t* frame) {
   assert(effects.restore(frame));
   assert(effects.render(state, frame));
@@ -192,6 +196,24 @@ void circularOrbitHasClearance() {
   assert(maxX-minX == 400 && maxY-minY == 400);
 }
 
+void sleepingZsAlternateSides() {
+  first.fill(0);
+  second.fill(0);
+  CharacterEffects effects(first.data() + 1, second.data() + 1);
+  bool left = false, right = false;
+  for (int tick = 0; tick < 30 * 30; ++tick) {
+    draw(effects, sleeping(std::fmod(tick / 30.f, 12.f)), first.data() + 1);
+    for (int y = 0; y < 80; ++y) {
+      for (int x = 0; x < kCharacterFrameWidth; ++x) {
+        if (!first[1 + y * kCharacterFrameWidth + x]) continue;
+        left |= x < kCharacterFrameWidth / 2;
+        right |= x > kCharacterFrameWidth / 2;
+      }
+    }
+  }
+  assert(left && right);
+}
+
 void protectionRestorationAndBudget() {
   static_assert(CharacterEffects::kDamageBudget == 4096);
   static_assert(sizeof(CharacterEffects) <= 2 * CharacterEffects::kDamageBudget * sizeof(uint32_t) + 64);
@@ -246,7 +268,8 @@ int main(int argc, char**) {
   visibleShapesAndDirection();
   continuityAndPoseIndependence();
   circularOrbitHasClearance();
+  sleepingZsAlternateSides();
   protectionRestorationAndBudget();
-  std::cout << "Working bits: visible 0/1 glyphs, opposing motion, wrap/pose continuity, "
-               "body protection, restoration, canaries and allocation guard passed\n";
+  std::cout << "Character effects: working bits and alternating sleeping Zs; opposing motion, "
+               "wrap/pose continuity, body protection, restoration, canaries and allocation guard passed\n";
 }

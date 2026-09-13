@@ -7,7 +7,8 @@
 A small, expressive companion for your desk. Its first character is inspired by
 GitHub Copilot and comes to life on a round AMOLED touchscreen: it looks around,
 blinks, reacts when tapped, and can display Working, Complete, and Needs attention
-states.
+states. After two uninterrupted Idle minutes, it sleeps for one minute and then
+repeats the Idle/Sleep cycle.
 
 It runs locally on the **Waveshare ESP32-S3-Touch-AMOLED-1.75-B or 1.75-C**.
 No Wi-Fi, cloud account, subscription, or microSD card is needed to run the
@@ -23,6 +24,8 @@ built-in character.
   Surprise, and settings actions when a speaker is attached.
 - **Agent states:** focused eyes and orbiting dots for Working, a celebration for Complete,
   and curious head tilts for Needs attention.
+- **Automatic sleep:** after two Idle minutes, the character sleeps for one minute
+  with subtle movement, drowsy eyelids, and drifting Zs.
 - **Compact graphics:** lossless sprite compression preserves the artwork while keeping
   the current sprite pack around 9.53 MB.
 - **Optional microSD:** read-only loading of the matching sprite pack, with built-in
@@ -33,21 +36,60 @@ controlled through USB serial commands, the swipe-up settings menu, or the
 included Copilot CLI daemon. **Additional characters and wireless daemon
 transports are not implemented yet**.
 
-### Copilot CLI companion daemon
+### Optional: Copilot CLI companion daemon
 
-The initial macOS integration uses a local TypeScript daemon and Copilot CLI
-lifecycle hooks. It automatically prefers the existing non-resetting USB command
-protocol; Wi-Fi and Bluetooth transports are planned behind the same interface.
+The TypeScript daemon connects Copilot CLI lifecycle hooks to the device over USB.
+It supports macOS and Linux directly, plus Windows through WSL 2. Install
+[Node.js 22.12 or newer](https://nodejs.org/) and flash the device first.
+
+**macOS or Linux**
 
 ```bash
 cd daemon
-npm install
-npm test
-npm run install:macos
+npm ci
+npm run install:daemon
+npm run status
 ```
 
-Restart Copilot CLI after installation so it loads the user-level hooks. The
-daemon maps active main-agent or subagent work to Working, permission and
+The installer creates and starts a macOS LaunchAgent or Linux systemd user
+service. If Linux reports a serial-port permission error, add your user to the
+`dialout` group, then sign out and back in:
+
+```bash
+sudo usermod -aG dialout "$USER"
+```
+
+**Windows through WSL 2**
+
+Run **Copilot CLI and the daemon inside the same WSL 2 distribution**; hooks
+installed in WSL cannot control a Copilot CLI process running natively on
+Windows. Install Node.js inside WSL. If systemd is not enabled, add the following
+to `/etc/wsl.conf`, then run `wsl --shutdown` from PowerShell and reopen WSL:
+
+```ini
+[boot]
+systemd=true
+```
+
+Windows does not expose USB devices to WSL automatically, so install
+[`usbipd-win`](https://learn.microsoft.com/windows/wsl/connect-usb), connect the
+device, and open PowerShell:
+
+```powershell
+usbipd list
+# Run once in an Administrator PowerShell, using the ESP32's BUSID:
+usbipd bind --busid <BUSID>
+# Run whenever the device needs to be attached to WSL:
+usbipd attach --wsl --busid <BUSID>
+```
+
+In WSL, confirm that `/dev/ttyACM*` or `/dev/ttyUSB*` exists, then run the same
+Linux installation commands shown above. While attached to WSL, the device is
+not available to native Windows applications.
+
+Restart Copilot CLI after installation so it loads the user-level hooks.
+`npm run status` should report `"connected": true`. The daemon maps active
+main-agent or subagent work to Working, permission and
 elicitation prompts to Needs attention, verified tool-using turns to Complete,
 and inactive sessions to Idle. Multiple CLI sessions are aggregated rather than
 overwriting one another. Timestamped leases discard abandoned work, while a
@@ -162,6 +204,28 @@ playback performance still needs verification with that file present.
 
 The native browser preview uses the same C++ motion and rendering code as the
 device. Source artwork, blink generation, and firmware export tools are included.
+
+### Character Lab
+
+Use Character Lab to review every character state and animation locally before
+uploading firmware to the device. It renders live RGB565 frames with the same C++
+motion, sprite, and effects code used by the ESP32. It requires Python 3.10+,
+`clang++`, and zlib; see the [source-build guide](docs/build-from-source.md) for
+platform prerequisites.
+
+From the repository root, run:
+
+```bash
+python3 tools/serve_preview.py
+```
+
+Then open [http://127.0.0.1:8765/character-preview.html](http://127.0.0.1:8765/character-preview.html).
+Each browser tab runs an isolated native renderer, with controls for pausing,
+playback speed, touch reactions, and each character state.
+
+<p align="center">
+  <img src="images/character-lab.webp" alt="Character Lab showing the native Copilot character preview and state controls" width="1000">
+</p>
 
 - [Build from source](docs/build-from-source.md)
 - [Development, preview, hardware, and serial commands](docs/development.md)

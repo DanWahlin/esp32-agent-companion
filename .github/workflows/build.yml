@@ -38,6 +38,12 @@ jobs:
           cache-dependency-path: |
             requirements-art.txt
             requirements-flash.txt
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.12.0'
+          cache: npm
+          cache-dependency-path: daemon/package-lock.json
       - name: Restore lossless compression cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -57,6 +63,7 @@ jobs:
           git diff --exit-code -- firmware/Copilot/generated/audio_assets.h firmware/Copilot/src/audio_data.cpp
       - name: Test native renderer and release tools
         run: |
+          bash tools/test.sh
           bash tools/test_sprite_cache.sh
           bash tools/test_sprite_renderer.sh
           bash tools/test_character.sh
@@ -64,7 +71,12 @@ jobs:
           bash tools/test_device_inputs.sh
           bash tools/run_sprite_motion_tests.sh
           bash tools/build_character_preview.sh
-          python -m unittest tests.test_audio_assets tests.test_sprite_firmware_assets tests.test_character_preview tests.test_device tests.test_firmware_artifacts tests.test_release_bundle tests.test_release_process
+          python -m unittest discover -s tests -p 'test_*.py'
+      - name: Test companion daemon
+        working-directory: daemon
+        run: |
+          npm ci
+          npm test
       - name: Set up Arduino CLI
         uses: arduino/setup-arduino-cli@81d310742121c928ea9c8bbd407b4217b432ae02 # v2.0.0
         with:

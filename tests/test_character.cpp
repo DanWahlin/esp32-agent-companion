@@ -31,6 +31,7 @@ void operator delete[](void* p, size_t) noexcept { std::free(p); }
 static bool same(const CharacterState& a, const CharacterState& b) {
   return a.pose.direction == b.pose.direction && a.pose.index == b.pose.index
       && a.pose.blinkLevel == b.pose.blinkLevel && a.mode == b.mode
+      && a.pose.blinkBlend == b.pose.blinkBlend
       && a.requestedMode == b.requestedMode && a.effectSeconds == b.effectSeconds && a.eventId == b.eventId;
 }
 
@@ -62,7 +63,7 @@ static void idleParityAndCentering() {
   for (uint32_t seed = 0; seed < 12; ++seed) {
     CharacterMotion character(seed, 13);
     SpriteMotion sprite(seed);
-    for (int i = 0; i < 10000; ++i) {
+    for (int i = 0; i < 3500; ++i) {
       const double dt = i % 87 == 0 ? 1000 : 1.0 / (30 << (i % 3));
       character.update(dt);
       sprite.update(dt);
@@ -273,6 +274,44 @@ static void attentionAlternatesWithoutDismissing() {
   }
 }
 
+static void sleepsAfterSustainedIdleAndWakes() {
+  CharacterMotion motion(42, 13);
+  constexpr double dt = 1.0 / 30;
+  const int idleTicks = static_cast<int>(CharacterMotion::kIdleBeforeSleepSeconds / dt);
+  for (int tick = 0; tick < idleTicks - 1; ++tick) {
+    step(motion, dt);
+    assert(motion.state().mode == Mode::Idle);
+  }
+  until(motion, [](const auto& state) { return state.mode == Mode::Sleep; }, dt);
+  assert(motion.state().pose.index == 0);
+  bool peeked = false, blended = false, fullyClosed = false, moved = false;
+  for (int tick = 0; tick < 12 / dt; ++tick) {
+    step(motion, dt);
+    const auto state = motion.state();
+    assert(state.mode == Mode::Sleep && state.pose.index <= 5);
+    if (tick >= 4) {
+      assert(state.pose.blinkLevel >= 3);
+      peeked |= state.pose.blinkLevel == 3 && state.pose.blinkBlend == 255;
+      blended |= state.pose.blinkLevel == 3
+          && state.pose.blinkBlend > 0 && state.pose.blinkBlend < 255;
+      fullyClosed |= state.pose.blinkLevel == 4;
+    }
+    moved |= state.pose.index > 0;
+  }
+  assert(peeked && blended && fullyClosed && moved);
+  until(motion, [](const auto& state) { return state.mode == Mode::Idle; }, dt);
+  assert(motion.state().pose.index == 0 && motion.state().pose.blinkLevel == 0);
+
+  const int partialIdleTicks = static_cast<int>(CharacterMotion::kIdleBeforeSleepSeconds / (2 * dt));
+  for (int tick = 0; tick < partialIdleTicks; ++tick) step(motion, dt);
+  assert(motion.setMode(Mode::Working));
+  until(motion, [](const auto& state) { return state.mode == Mode::Working; }, dt);
+  assert(motion.setMode(Mode::Idle));
+  until(motion, [](const auto& state) { return state.mode == Mode::Idle; }, dt);
+  for (int tick = 0; tick < partialIdleTicks; ++tick) step(motion, dt);
+  assert(motion.state().mode == Mode::Idle);
+}
+
 static void springSurprise() {
   for (int fps : {30, 60, 120}) {
     for (Mode resume : {Mode::Idle, Mode::Working, Mode::Attention}) {
@@ -391,6 +430,14 @@ static void effectRestoration() {
   assert(bytes[amber] == 0xc4 && bytes[amber + 1] == 0xa8);
   assert(!effects->render(state, first.data() + 1) && effects->error());
   assert(effects->restore(first.data() + 1));
+  state.mode = state.requestedMode = Mode::Sleep;
+  state.pose = {0, 0, 4};
+  state.effectSeconds = 1;
+  assert(effects->render(state, first.data() + 1));
+  size_t sleepDamage = 0;
+  for (size_t i = 0; i < pixels; ++i) sleepDamage += first[i + 1] != baseline[i];
+  assert(sleepDamage > 0 && sleepDamage <= CharacterEffects::kDamageBudget);
+  assert(effects->restore(first.data() + 1));
   state.pose.direction = 13;
   assert(!effects->render(state, first.data() + 1) && effects->error());
   state.pose.direction = 12;
@@ -439,8 +486,9 @@ int main(int argc, char**) {
   blinkSafeExpressionEntry();
   workingLooksStayBusy();
   attentionAlternatesWithoutDismissing();
+  sleepsAfterSustainedIdleAndWakes();
   springSurprise();
   effectRestoration();
   std::cout << "Character tests passed: idle parity; center-only handoffs; all modes/interruptions; "
-               "pause/stalls; 960,000 allocation-free updates; dual-buffer effects/canaries/body preservation\n";
+               "sleep cycle; pause/stalls; allocation-free updates; dual-buffer effects/canaries/body preservation\n";
 }

@@ -36,7 +36,7 @@ int main() {
     int consumed = 0;
     if (std::sscanf(line, "%lf %lf %lf %n", &dt, &requestedMode, &requestedPlaying, &consumed) != 3
         || line[consumed] != '\0' || !std::isfinite(dt) || dt < 0 || dt > 86400
-        || !std::isfinite(requestedMode) || requestedMode < -1 || requestedMode > 4
+        || !std::isfinite(requestedMode) || requestedMode < -1 || requestedMode > 5
         || std::floor(requestedMode) != requestedMode
         || !std::isfinite(requestedPlaying) || (requestedPlaying != 0 && requestedPlaying != 1)) {
       std::cout << "ERR Invalid character command\n" << std::flush;

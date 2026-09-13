@@ -200,6 +200,7 @@ const char* modeName(CharacterMode mode) {
     case CharacterMode::Working: return "working";
     case CharacterMode::Complete: return "complete";
     case CharacterMode::Attention: return "attention";
+    case CharacterMode::Sleep: return "sleep";
   }
   return "invalid";
 }
@@ -270,7 +271,8 @@ void queueModeCue(CharacterMode mode) {
     case CharacterMode::Attention: queueAudioCue(AudioCue::Attention); break;
     case CharacterMode::Complete: queueAudioCue(AudioCue::Complete); break;
     case CharacterMode::Surprise: queueAudioCue(AudioCue::Surprise); break;
-    case CharacterMode::Idle: break;
+    case CharacterMode::Idle:
+    case CharacterMode::Sleep: break;
   }
 }
 

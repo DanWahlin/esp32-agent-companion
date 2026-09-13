@@ -127,6 +127,10 @@ void audioTask(void*) {
       es8311_voice_fade(codec, ES8311_FADE_64LRCK) != ESP_OK ||
       es8311_voice_mute(codec, true) != ESP_OK) {
     Serial.println("AUDIO error=codec-init");
+    if (codec) {
+      es8311_delete(codec);
+      codec = nullptr;
+    }
     i2s.end();
     vTaskDelete(nullptr);
     return;

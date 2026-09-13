@@ -11,7 +11,8 @@
     "test": "npm run build && node --test dist/test/*.test.js",
     "start": "node dist/src/cli.js daemon",
     "status": "node dist/src/cli.js status",
-    "install:macos": "npm run build && node scripts/install-macos.mjs"
+    "install:daemon": "npm run build && node dist/src/install.js",
+    "install:macos": "npm run install:daemon"
   },
   "dependencies": {
     "serialport": "13.0.0"

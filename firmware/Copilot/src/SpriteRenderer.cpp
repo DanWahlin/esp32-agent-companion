@@ -1,5 +1,7 @@
 #include "SpriteRenderer.h"
 #include "SpriteStorage.h"
+#include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #ifdef ARDUINO_ARCH_ESP32
 #include <esp_timer.h>
@@ -19,6 +21,7 @@ uint64_t microsNow() {
   return 0;
 #endif
 }
+
 }
 
 SpriteRenderer::SpriteRenderer(uint16_t* firstOpenPatch, uint16_t* secondOpenPatch, uint16_t* patch,
@@ -57,7 +60,8 @@ bool SpriteRenderer::render(const SpritePose& pose, uint16_t* frame) {
     return false;
   }
   if (pose.direction >= kSpriteDirections || pose.index >= kSpriteTrackSteps[pose.direction]
-      || pose.blinkLevel >= kSpriteBlinkLevels) {
+      || pose.blinkLevel >= kSpriteBlinkLevels
+      || (pose.blinkBlend && pose.blinkLevel + 1 >= kSpriteBlinkLevels)) {
     error_ = "Invalid discrete sprite pose.";
     return false;
   }
@@ -72,7 +76,8 @@ bool SpriteRenderer::render(const SpritePose& pose, uint16_t* frame) {
     return false;
   }
   const unsigned index = kSpriteTrackOffsets[pose.direction] + pose.index;
-  const uint32_t key = index * kSpriteBlinkLevels + pose.blinkLevel;
+  const uint32_t key = (index * kSpriteBlinkLevels + pose.blinkLevel) * 256
+      + pose.blinkBlend;
   if (outputKeys_[outputIndex] == key) return true;
   const SpriteFrame& entry = kSpriteFrames[index];
   const int top = (outputHeight_ - kSpriteHeight) / 2;
@@ -134,6 +139,20 @@ bool SpriteRenderer::render(const SpritePose& pose, uint16_t* frame) {
     for (int y = 0; y < entry.patchHeight; ++y) {
       std::memcpy(art + (entry.patchY + y) * outputWidth_ + entry.patchX,
                   pixels + y * entry.patchWidth, entry.patchWidth * sizeof(uint16_t));
+    }
+    if (pose.blinkBlend) {
+      if (!decode(entry.blinks[pose.blinkLevel], patch_, patchPixels,
+                  entry.patchWidth, entry.patchWidth)) return false;
+      const int revealHalfHeight = std::max(
+          1, static_cast<int>((static_cast<unsigned>(pose.blinkBlend)
+              * (entry.patchHeight + 1) / 2 + 254) / 255));
+      const int center = entry.patchHeight / 2;
+      for (int y = 0; y < entry.patchHeight; ++y) {
+        uint16_t* output = art + (entry.patchY + y) * outputWidth_ + entry.patchX;
+        const uint16_t* next = patch_ + y * entry.patchWidth;
+        if (std::abs(y - center) >= revealHalfHeight)
+          std::memcpy(output, next, entry.patchWidth * sizeof(uint16_t));
+      }
     }
   }
   eyesUs = microsNow() - started;

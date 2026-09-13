@@ -31,7 +31,8 @@ def write_zip(path, files):
             archive.writestr(info, data)
 
 
-def package(root, version, name="esp32-copilot", output=None, repository="DanWahlin/esp32-copilot"):
+def package(root, version, name="esp32-agent-companion", output=None,
+            repository="DanWahlin/esp32-agent-companion"):
     root = Path(root)
     validate_identity(name, version)
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository, flags=re.ASCII):
@@ -109,10 +110,11 @@ def package(root, version, name="esp32-copilot", output=None, repository="DanWah
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--name", default="esp32-copilot", help="Lowercase ASCII release slug")
+    parser.add_argument("--name", default="esp32-agent-companion", help="Lowercase ASCII release slug")
     parser.add_argument("--version", required=True, help="Stable SemVer without a v prefix")
     parser.add_argument("--output", type=Path, default=ROOT / "build/release")
-    parser.add_argument("--repository", default="DanWahlin/esp32-copilot", help="Owner/repository for INSTALL links")
+    parser.add_argument("--repository", default="DanWahlin/esp32-agent-companion",
+                        help="Owner/repository for INSTALL links")
     args = parser.parse_args(argv)
     try:
         for path in package(ROOT, args.version, args.name, args.output, args.repository):

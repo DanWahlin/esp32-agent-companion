@@ -27,6 +27,10 @@ export class UsbTransport {
     return this.#path;
   }
 
+  get state(): CharacterState {
+    return this.#desired;
+  }
+
   start(): void {
     void this.#scan();
     this.#scanTimer = setInterval(() => void this.#scan(), 2000);
@@ -58,10 +62,12 @@ export class UsbTransport {
       const ports = await SerialPort.list();
       const candidate = ports.find(port => port.path === this.#preferredPort)
         ?? ports.find(port => port.vendorId?.toLowerCase() === '303a'
-          && /^\/dev\/(?:cu|tty)\.usbmodem/i.test(port.path))
-        ?? ports.find(port => /^\/dev\/(?:cu|tty)\.usbmodem/i.test(port.path));
+          && isLikelyEsp32Port(port.path))
+        ?? ports.find(port => isLikelyEsp32Port(port.path));
       if (!candidate) return;
-      const path = candidate.path.replace(/^\/dev\/tty\./, '/dev/cu.');
+      const path = process.platform === 'darwin'
+        ? candidate.path.replace(/^\/dev\/tty\./, '/dev/cu.')
+        : candidate.path;
       await this.#open(path);
     } catch (error) {
       console.error(`[usb] discovery failed: ${this.#message(error)}`);
@@ -136,6 +142,12 @@ export class UsbTransport {
 
   #onData(data: Buffer): void {
     this.#buffer += data.toString('utf8');
+    if (this.#buffer.length > 65536) {
+      console.error('[usb] discarded oversized unterminated serial response');
+      this.#buffer = '';
+      this.#rejectWaiters(new Error('USB device returned an oversized response.'));
+      return;
+    }
     for (;;) {
       const newline = this.#buffer.indexOf('\n');
       if (newline < 0) break;
@@ -175,4 +187,10 @@ export class UsbTransport {
   #message(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
   }
+}
+
+export function isLikelyEsp32Port(
+    path: string, platform: NodeJS.Platform = process.platform): boolean {
+  if (platform === 'darwin') return /^\/dev\/(?:cu|tty)\.usbmodem/i.test(path);
+  return /^\/dev\/tty(?:ACM|USB)\d+$/i.test(path);
 }

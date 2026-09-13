@@ -15,11 +15,18 @@ double inverse(double value) {
   }
   return (low + high) / 2;
 }
+double smooth(double value) {
+  return value * value * value * (value * (value * 6 - 15) + 10);
+}
 bool latched(CharacterMode mode) {
   return mode == CharacterMode::Working || mode == CharacterMode::Attention;
 }
 bool preservesExpression(CharacterMode mode) {
-  return mode == CharacterMode::Surprise || mode == CharacterMode::Complete;
+  return mode == CharacterMode::Surprise || mode == CharacterMode::Complete
+      || mode == CharacterMode::Sleep;
+}
+bool stable(CharacterMode mode) {
+  return latched(mode) || mode == CharacterMode::Idle || mode == CharacterMode::Sleep;
 }
 }
 
@@ -39,21 +46,29 @@ double CharacterMotion::range(double low, double high) {
 }
 
 bool CharacterMotion::setMode(CharacterMode mode) {
-  if (static_cast<uint8_t>(mode) > static_cast<uint8_t>(CharacterMode::Attention)) {
+  if (static_cast<uint8_t>(mode) > static_cast<uint8_t>(CharacterMode::Sleep)) {
     error_ = "Unknown character mode.";
     return false;
   }
-  if (available_ < 8 || (mode != CharacterMode::Idle && available_ < 13)) {
+  if (available_ < 8
+      || (mode != CharacterMode::Idle && mode != CharacterMode::Sleep && available_ < 13)) {
     error_ = "Expression assets unavailable: export all 13 character tracks first.";
     return false;
   }
   error_ = nullptr;
-  if ((latched(mode) || mode == CharacterMode::Idle) && next_ == mode) return true;
+  if (stable(mode) && next_ == mode) return true;
   if (mode != CharacterMode::Surprise) persistent_ = latched(mode) ? mode : CharacterMode::Idle;
   if (mode_ == CharacterMode::Surprise) repeatSurprise_ = mode == CharacterMode::Surprise;
   next_ = mode;
   ++eventId_;
   effectSeconds_ = 0;
+  idleSeconds_ = 0;
+  if (mode_ == CharacterMode::Sleep && mode != CharacterMode::Sleep) {
+    sleepExiting_ = true;
+    sleepTransitionSeconds_ = 0;
+    if (!idle_.returnToCenter(1.2)) return false;
+    return true;
+  }
   if (mode_ == CharacterMode::Idle) {
     idle_.returnToCenter(mode == CharacterMode::Surprise ? .35 : .65);
   } else {
@@ -71,7 +86,35 @@ void CharacterMotion::surpriseToIdle() {
 
 CharacterState CharacterMotion::state() const {
   SpritePose pose = mode_ == CharacterMode::Idle ? idle_.pose() : pose_;
-  pose.blinkLevel = idle_.pose().blinkLevel;
+  if (mode_ == CharacterMode::Sleep) {
+    pose = idle_.pose();
+    if (sleepExiting_) {
+      pose.blinkLevel = pose.index ? 4 : static_cast<uint8_t>(std::max(
+          0, 4 - static_cast<int>(sleepTransitionSeconds_ / .035)));
+    } else if (sleepTransitionSeconds_ < .12) {
+      pose.blinkLevel = static_cast<uint8_t>(std::min(
+          4, static_cast<int>(sleepTransitionSeconds_ / .03)));
+    } else {
+      const double sleepy = std::fmod(sleepSeconds_, 10.0);
+      if (sleepy < 4) {
+        double openness;
+        if (sleepy < 1.5) openness = smooth(sleepy / 1.5);
+        else if (sleepy < 2.5) openness = 1;
+        else openness = smooth((4 - sleepy) / 1.5);
+        if (openness > 0) {
+          pose.blinkLevel = 3;
+          pose.blinkBlend = static_cast<uint8_t>(
+              std::max(1l, std::lround(255 * openness)));
+        } else {
+          pose.blinkLevel = 4;
+        }
+      } else {
+        pose.blinkLevel = 4;
+      }
+    }
+  } else {
+    pose.blinkLevel = idle_.pose().blinkLevel;
+  }
   return {pose, mode_, next_, static_cast<float>(effectSeconds_), eventId_};
 }
 
@@ -96,8 +139,20 @@ void CharacterMotion::enter(CharacterMode mode) {
   effectSeconds_ = 0;
   repeatSurprise_ = false;
   if (mode == CharacterMode::Idle) {
+    idleSeconds_ = 0;
     idle_.setDuration(1.8);
     idle_.setAutomatic(true);
+    return;
+  }
+  if (mode == CharacterMode::Sleep) {
+    pose_ = idle_.pose();
+    pose_.index = 0;
+    sleepSeconds_ = 0;
+    sleepTransitionSeconds_ = 0;
+    sleepMotionWait_ = range(3.5, 6.5);
+    sleepExiting_ = false;
+    idle_.setAutomatic(false);
+    idle_.setDuration(3.4);
     return;
   }
   pose_.direction = 7 + static_cast<uint8_t>(mode);
@@ -217,6 +272,35 @@ void CharacterMotion::update(double dt) {
       idle_.setAutomatic(true);
     }
     idle_.update(dt);
+    if (next_ == CharacterMode::Idle) {
+      idleSeconds_ += dt;
+      if (idleSeconds_ >= kIdleBeforeSleepSeconds) setMode(CharacterMode::Sleep);
+    }
+  } else if (mode_ == CharacterMode::Sleep) {
+    idle_.update(dt);
+    if (sleepExiting_) {
+      if (idle_.pose().index) return;
+      sleepTransitionSeconds_ += dt;
+      if (sleepTransitionSeconds_ >= .14) enter(next_);
+      return;
+    }
+    sleepTransitionSeconds_ += dt;
+    sleepSeconds_ += dt;
+    sleepMotionWait_ -= dt;
+    if (sleepMotionWait_ <= 0 && idle_.pose().index == 0
+        && idle_.phase() == SpriteMotion::Phase::Center) {
+      if (!idle_.request(range(0, 1) < .5 ? 0 : 1, range(.12, .22))) {
+        error_ = idle_.error();
+        return;
+      }
+      sleepMotionWait_ = range(4.5, 8);
+    }
+    if (sleepSeconds_ >= kSleepSeconds) {
+      next_ = CharacterMode::Idle;
+      sleepExiting_ = true;
+      sleepTransitionSeconds_ = 0;
+      if (!idle_.returnToCenter(1.2)) error_ = idle_.error();
+    }
   } else {
     idle_.update(dt);  // Stationary center, with the original independent blink clock.
     advanceExpression(dt);

@@ -17,7 +17,7 @@ export async function runDaemon(): Promise<void> {
   });
   usb.setState(coordinator.state);
   const path = socketPath();
-  await mkdir(dirname(path), {recursive: true});
+  await mkdir(dirname(path), {recursive: true, mode: 0o700});
   await removeStaleSocket(path);
 
   const server = createServer(socket => handleSocket(socket, coordinator, usb));
@@ -49,10 +49,12 @@ export async function runDaemon(): Promise<void> {
 
 function handleSocket(socket: Socket, coordinator: StateCoordinator, usb: UsbTransport): void {
   socket.setEncoding('utf8');
+  socket.setTimeout(2000, () => socket.destroy());
+  socket.on('error', () => undefined);
   let input = '';
   socket.on('data', chunk => {
     input += chunk;
-    if (input.length > 65536) socket.destroy(new Error('Request is too large.'));
+    if (input.length > 65536) socket.destroy();
   });
   socket.on('end', () => {
     try {
@@ -65,7 +67,7 @@ function handleSocket(socket: Socket, coordinator: StateCoordinator, usb: UsbTra
         respond(socket, {ok: true, state: request.state});
       } else if (request.type === 'status') {
         const status: DaemonStatus = {
-          state: coordinator.state,
+          state: usb.state,
           transport: usb.connected ? 'usb' : null,
           connected: usb.connected,
           port: usb.path,

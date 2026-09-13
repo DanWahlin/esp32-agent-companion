@@ -81,11 +81,14 @@ bool SpriteMotion::setSpeed(double value) {
   return valid();
 }
 
-bool SpriteMotion::request(int direction) {
+bool SpriteMotion::request(int direction, double depth) {
   if (!valid()) return fail(kInvalidCount);
   if (direction < 0 || direction >= 8) return fail("Unknown sprite direction.");
+  if (!std::isfinite(depth) || depth <= 0 || depth > 1)
+    return fail("Sprite direction depth must be between zero and one.");
   if (queueSize_ == kQueueCapacity) return fail("Sprite direction queue is full.");
-  queue_[(queueHead_ + queueSize_) % kQueueCapacity] = static_cast<uint8_t>(direction);
+  queue_[(queueHead_ + queueSize_) % kQueueCapacity] = {
+      static_cast<uint8_t>(direction), depth};
   ++queueSize_;
   clearError();
   return true;
@@ -104,9 +107,11 @@ bool SpriteMotion::returnToCenter(double duration) {
 
 void SpriteMotion::startTurn() {
   uint8_t direction;
-  bool fullDepth = true;
+  double depth = 1;
   if (queueSize_) {
-    direction = queue_[queueHead_];
+    const Request request = queue_[queueHead_];
+    direction = request.direction;
+    depth = request.depth;
     queueHead_ = (queueHead_ + 1) % kQueueCapacity;
     --queueSize_;
   } else if (cycling_) {
@@ -115,14 +120,14 @@ void SpriteMotion::startTurn() {
   } else if (automatic_) {
     direction = static_cast<uint8_t>(std::floor(random() * 7));
     if (direction >= pose_.direction) ++direction;
-    fullDepth = false;
+    depth = range(.55, 1);
   } else {
     return;
   }
   pose_.direction = direction;
   const int limit = std::max(1, (direction == 2 || direction == 3)
       ? (count_ - 1) / 2 : count_ - 1);
-  target_ = static_cast<uint8_t>(fullDepth ? limit : std::round(range(.55, 1) * limit));
+  target_ = static_cast<uint8_t>(std::max(1.0, std::round(depth * limit)));
   phase_ = Phase::Out;
   progress_ = 0;
 }

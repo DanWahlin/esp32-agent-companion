@@ -143,6 +143,16 @@ test('ignores delayed main and subagent events', () => {
   coordinator.close();
 });
 
+test('ignores a delayed session end while a newer subagent is active', () => {
+  const {coordinator} = fixture();
+  coordinator.handle('userPromptSubmitted', {sessionId: 'one', timestamp: 2000});
+  coordinator.handle('subagentStart', {sessionId: 'one', agentId: 'child', timestamp: 4000});
+  assert.equal(coordinator.handle('sessionEnd', {sessionId: 'one', timestamp: 3000}), false);
+  assert.equal(coordinator.state, 'working');
+  assert.equal(coordinator.sessionCount, 1);
+  coordinator.close();
+});
+
 test('clamps implausible future timestamps to daemon time', () => {
   const {coordinator, payload, advance} = fixture();
   coordinator.handle('userPromptSubmitted', {sessionId: 'one', timestamp: 9_999_999});

@@ -7,6 +7,7 @@ struct SpritePose {
   uint8_t direction = 0;
   uint8_t index = 0;
   uint8_t blinkLevel = 0;
+  uint8_t blinkBlend = 0;
 };
 
 // Tracks: right, left, up, down, up_right, up_left, down_right, down_left.
@@ -34,7 +35,7 @@ class SpriteMotion {
   bool setSpeed(double value);
   // Fixed FIFO: invalid directions/full queues return false without dropping work.
   // Failed controls set error(); a successful bool control clears it.
-  bool request(int direction);
+  bool request(int direction, double depth = 1);
   bool returnToCenter(double duration = .65);
   void requestBlink() { blinkQueued_ = true; }
 
@@ -81,7 +82,11 @@ class SpriteMotion {
   bool blinkQueued_ = false;
   bool doublePending_ = false;
   uint8_t cycleIndex_ = 0;
-  uint8_t queue_[kQueueCapacity] = {};
+  struct Request {
+    uint8_t direction = 0;
+    double depth = 1;
+  };
+  Request queue_[kQueueCapacity] = {};
   size_t queueHead_ = 0;
   size_t queueSize_ = 0;
   const char* error_ = nullptr;

@@ -2,7 +2,7 @@
 #include "SpriteMotion.h"
 
 namespace copilot {
-enum class CharacterMode : uint8_t { Idle, Surprise, Working, Complete, Attention };
+enum class CharacterMode : uint8_t { Idle, Surprise, Working, Complete, Attention, Sleep };
 struct CharacterState {
   SpritePose pose;
   // Visible track and next destination; transitions settle at a shared-center pose.
@@ -15,6 +15,8 @@ struct CharacterState {
 
 class CharacterMotion {
  public:
+  static constexpr double kIdleBeforeSleepSeconds = 2 * 60;
+  static constexpr double kSleepSeconds = 60;
   explicit CharacterMotion(uint32_t seed);
   // Explicit availability supports host fixtures; production uses generated metadata.
   CharacterMotion(uint32_t seed, uint8_t availableDirections);
@@ -48,9 +50,14 @@ class CharacterMotion {
   uint8_t from_ = 0, to_ = 23;
   double progress_ = 0, duration_ = .85, hold_ = 0;
   double effectSeconds_ = 0;
+  double idleSeconds_ = 0;
+  double sleepSeconds_ = 0;
+  double sleepTransitionSeconds_ = 0;
+  double sleepMotionWait_ = 0;
   double cachedInterval_ = 0;
   int cachedIndex_ = -1;
   uint32_t eventId_ = 0;
+  bool sleepExiting_ = false;
   bool playing_ = true;
   const char* error_ = nullptr;
 };

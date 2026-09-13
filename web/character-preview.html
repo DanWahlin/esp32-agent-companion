@@ -39,6 +39,7 @@
             <button type="button" data-mode="2" aria-pressed="false"><span class="symbol cyan">◌</span><span><strong>Working</strong><small>Focused eyes, slow glances and tiny binary streams</small></span><span class="key">3</span></button>
             <button type="button" data-mode="3" aria-pressed="false"><span class="symbol lilac">✦</span><span><strong>Complete</strong><small>Fireworks and confetti, then idle</small></span><span class="key">4</span></button>
             <button type="button" data-mode="4" aria-pressed="false"><span class="symbol amber">?</span><span><strong>Needs attention</strong><small>Alternating curious eyes and head tilts</small></span><span class="key">5</span></button>
+            <button type="button" data-mode="5" aria-pressed="false"><span class="symbol lilac">Z</span><span><strong>Sleeping</strong><small>Closed eyes with drifting Zs after two idle minutes</small></span><span class="key">6</span></button>
           </div>
           <p id="status" role="status">Every track change passes through the shared center.</p>
           <div id="error" role="alert" hidden></div>
@@ -48,6 +49,7 @@
           <p>The new touch reaction briefly shrinks as its eyes widen, then makes a small spring rebound and settles in about 0.8 seconds once centered. It replaces the long double-take. Use ¼× to inspect the motion.</p>
           <p>Working eases from normal to focused eyes, occasionally looks slowly left or right, then refocuses. The balls now follow a 400 × 400 circular path with more space around the head. The binary streams remain; the three bottom dots are removed for a cleaner look.</p>
           <p>Needs attention alternates the larger eye and curious head tilt, pausing on each side and easing through center. The question badge stays visible while waiting.</p>
+          <p>After two uninterrupted idle minutes, the character centers, closes its eyes, and sleeps for one minute while Zs drift upward. It then wakes and repeats the cycle after another two idle minutes.</p>
           <p>One C++ motion engine, two persistent framebuffers. Effects touch only black background pixels; the generated face stays intact.</p>
           <p>The spring touch reaction and 400 × 400 circular orbit are now deployed to the device, using the same motion and rendering code as this preview.</p>
           <p id="assets">Checking exported artwork…</p>

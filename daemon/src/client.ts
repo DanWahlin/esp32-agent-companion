@@ -12,7 +12,13 @@ export function requestDaemon(request: DaemonRequest, timeoutMs = 500): Promise<
     }, timeoutMs);
     socket.setEncoding('utf8');
     socket.on('connect', () => socket.end(`${JSON.stringify(request)}\n`));
-    socket.on('data', chunk => { buffer += chunk; });
+    socket.on('data', chunk => {
+      buffer += chunk;
+      if (buffer.length <= 65536) return;
+      clearTimeout(timer);
+      socket.destroy();
+      reject(new Error('Agent Companion daemon returned an oversized response.'));
+    });
     socket.on('end', () => {
       clearTimeout(timer);
       try {

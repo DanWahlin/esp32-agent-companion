@@ -75,6 +75,16 @@ void CharacterEffects::spark(int x, int y, int radius, uint16_t rgb) {
   }
 }
 
+void CharacterEffects::glyph(
+    const uint8_t* rows, int rowCount, int x, int y, int scale, uint16_t rgb) {
+  for (int row = 0; row < rowCount; ++row)
+    for (int column = 0; column < 5; ++column)
+      if (rows[row] & (1 << (4 - column)))
+        for (int dy = 0; dy < scale; ++dy)
+          for (int dx = 0; dx < scale; ++dx)
+            pixel(x + column * scale + dx, y + row * scale + dy, rgb);
+}
+
 void CharacterEffects::workingBits(double seconds) {
   constexpr uint8_t glyphs[2][9] = {
     {14, 17, 17, 17, 17, 17, 17, 17, 14},
@@ -95,10 +105,27 @@ void CharacterEffects::workingBits(double seconds) {
       const int y = lane < 2 ? top + travel : bottom - travel;
       const int x = kFrameWidth / 2 + lanes[lane];
       const uint8_t* glyph = glyphs[(lane + slot) % 2];
-      for (int row = 0; row < 9; ++row)
-        for (int column = 0; column < 5; ++column)
-          if (glyph[row] & (1 << (4 - column))) pixel(x + column, y + row, rgb);
+      this->glyph(glyph, 9, x, y, 1, rgb);
     }
+  }
+}
+
+void CharacterEffects::sleepingZs(double seconds) {
+  constexpr uint8_t z[] = {31, 1, 2, 4, 8, 16, 31};
+  constexpr int rightXs[] = {228, 253, 281};
+  constexpr int leftXs[] = {167, 142, 105};
+  constexpr int scales[] = {1, 1, 2};
+  constexpr int bottom = 72, top = -18;
+  for (int lane = 0; lane < 3; ++lane) {
+    const double position = seconds / 3.6 + lane * .31;
+    const uint32_t sequence = static_cast<uint32_t>(std::floor(position));
+    const double phase = position - std::floor(position);
+    const double edge = std::min(phase, 1 - phase);
+    const double fade = std::min(1.0, edge / .14);
+    const int y = bottom - static_cast<int>(std::lround((bottom - top) * phase));
+    const bool right = hash(sequence * 13 + lane * 101) & 1;
+    glyph(z, 7, right ? rightXs[lane] : leftXs[lane], y, scales[lane],
+          color(174, 190, 255, .85 * fade));
   }
 }
 
@@ -110,7 +137,8 @@ bool CharacterEffects::render(const CharacterState& state, uint16_t* frame) {
     error_ = "Restore previous effects before rendering this output buffer.";
     return false;
   }
-  if (static_cast<uint8_t>(state.mode) > 4 || static_cast<uint8_t>(state.requestedMode) > 4
+  if (static_cast<uint8_t>(state.mode) > static_cast<uint8_t>(CharacterMode::Sleep)
+      || static_cast<uint8_t>(state.requestedMode) > static_cast<uint8_t>(CharacterMode::Sleep)
       || !std::isfinite(state.effectSeconds) || state.effectSeconds < 0 || state.effectSeconds > 12
       || state.pose.direction >= kSpriteDirections || state.pose.index > 23 || state.pose.blinkLevel > 4) {
     error_ = "Invalid character effect state.";
@@ -132,6 +160,8 @@ bool CharacterEffects::render(const CharacterState& state, uint16_t* frame) {
       x = nextX;
     }
     workingBits(t);
+  } else if (state.mode == CharacterMode::Sleep) {
+    sleepingZs(t);
   } else if (state.mode == CharacterMode::Attention) {
     const double breath = .78 + .17 * std::sin(t * pi / 2);
     constexpr uint8_t question[] = {14, 17, 1, 2, 4, 0, 4};

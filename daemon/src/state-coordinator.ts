@@ -99,7 +99,10 @@ export class StateCoordinator {
     }
     if (event === 'sessionEnd') {
       const session = this.#sessions.get(sessionId);
-      if (session && occurredAt < session.lastMainEventAt) return false;
+      if (session && (occurredAt < session.lastMainEventAt
+          || [...session.subagents.values()].some(agent => occurredAt < agent.lastEventAt))) {
+        return false;
+      }
       this.#sessions.delete(sessionId);
       this.#changed();
       return true;

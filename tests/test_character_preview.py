@@ -54,8 +54,10 @@ class CharacterPreviewTests(unittest.TestCase):
                 after, current = renderer.frame({})
                 self.assertEqual(before, after)
                 self.assertEqual(current["eventId"], "0")
+            _, sleeping = renderer.frame({"mode": 5, "delta": 1 / 30})
+            self.assertEqual(sleeping["requestedMode"], "5")
             return
-        for mode in (4, 1, 2, 3, 0):
+        for mode in (5, 4, 1, 2, 3, 0):
             _, current = renderer.frame({"mode": mode, "delta": 1 / 30})
             previous = current
             for _ in range(240):
@@ -93,7 +95,7 @@ class CharacterPreviewTests(unittest.TestCase):
     def test_validation_and_bounded_sessions(self):
         renderer = self.create()
         for payload in ([], {"delta": True}, {"delta": float("nan")}, {"delta": -1},
-                        {"delta": 86401}, {"mode": True}, {"mode": 5}, {"mode": -2},
+                        {"delta": 86401}, {"mode": True}, {"mode": 6}, {"mode": -2},
                         {"playing": 1}, {"playing": "false"}):
             with self.assertRaises(ValueError):
                 renderer.frame(payload)

@@ -17,7 +17,7 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
     await page.waitForFunction(() => !document.getElementById('play').disabled);
     assert.equal(await page.locator('#play').textContent(), 'Play');
     assert.equal(await page.locator('#connection').textContent(), 'Paused');
-    assert.equal(await page.locator('[data-mode]').count(), 5);
+    assert.equal(await page.locator('[data-mode]').count(), 6);
     assert.equal(await page.locator('#error').isVisible(), false);
     const fullArt = (await page.locator('#assets').textContent()).startsWith('All 13');
     const initial = await page.locator('#screen').evaluate(canvas => canvas.toDataURL());
@@ -45,7 +45,7 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
       }
     });
     assert.equal(parity, true, 'Canvas exactly decodes native RGB565 output');
-    for (let mode = 1; mode <= 4; mode++) {
+    for (let mode = 1; mode <= 5; mode++) {
       const response = page.waitForResponse(res => res.url().endsWith('/api/character/frame')
         && res.request().postDataJSON().mode === mode);
       await page.locator(`[data-mode="${mode}"]`).click();
@@ -103,14 +103,15 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
       await page.waitForFunction(() => document.getElementById('visible').textContent === 'Idle');
       for (const [mode, name, label] of [
         [2, 'working', 'Working'], [4, 'attention', 'Needs attention'],
-        [1, 'surprise', 'Surprise'], [3, 'complete', 'Complete'],
+        [5, 'sleep', 'Sleeping'], [1, 'surprise', 'Surprise'], [3, 'complete', 'Complete'],
       ]) {
         if (mode === 1) await page.locator('#speed').selectOption('0.25');
         await page.locator(`[data-mode="${mode}"]`).click();
         await page.waitForFunction(({label, mode}) => {
           const index = Number(document.getElementById('pose').textContent.split(':')[1].split('/')[0]);
+          const blink = Number(document.getElementById('pose').textContent.split('/')[1]);
           return document.getElementById('visible').textContent === label
-            && (mode === 1 ? index >= 3 && index <= 7 : index >= 21);
+            && (mode === 1 ? index >= 3 && index <= 7 : mode === 5 ? blink === 4 : index >= 21);
         }, {label, mode});
         await page.locator('#play').click();
         await page.waitForFunction(() => document.getElementById('connection').textContent === 'Paused');
@@ -134,7 +135,7 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
     await page.screenshot({path: 'build/character-preview-mobile.png', fullPage: true});
     if (fullArt) {
       await page.goto(`${base}/sprite-preview.html`);
-      for (const mode of ['surprise', 'working', 'complete', 'attention']) {
+      for (const mode of ['surprise', 'working', 'complete', 'attention', 'sleep']) {
         assert.equal(await page.locator(`a[href="/character-preview.html?mode=${mode}"]`).count(), 1);
       }
       await page.locator('a[href="/character-preview.html?mode=working"]').click();

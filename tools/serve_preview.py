@@ -111,8 +111,8 @@ class NativeCharacterRenderer(NativeRenderer):
         playing = payload.get("playing", True)
         if type(delta) not in (int, float) or not math.isfinite(delta) or not 0 <= delta <= 86400:
             raise ValueError("delta must be a finite number between zero and 86400.")
-        if type(mode) is not int or not -1 <= mode <= 4:
-            raise ValueError("Character mode must be -1 (unchanged) or 0..4.")
+        if type(mode) is not int or not -1 <= mode <= 5:
+            raise ValueError("Character mode must be -1 (unchanged) or 0..5.")
         if type(playing) is not bool:
             raise ValueError("playing must be a boolean.")
         if not self.lock.acquire(blocking=False):

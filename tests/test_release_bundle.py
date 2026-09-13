@@ -70,8 +70,8 @@ class ReleaseBundleTests(unittest.TestCase):
         original = [firmware.read_bytes(), sd.read_bytes()]
         package_release.package(self.root, "1.2.3")
         self.assertEqual(original, [firmware.read_bytes(), sd.read_bytes()])
-        self.assertEqual(firmware.name, "esp32-copilot-v1.2.3-firmware.zip")
-        self.assertEqual(sd.name, "esp32-copilot-v1.2.3-sd-card.zip")
+        self.assertEqual(firmware.name, "esp32-agent-companion-v1.2.3-firmware.zip")
+        self.assertEqual(sd.name, "esp32-agent-companion-v1.2.3-sd-card.zip")
         with zipfile.ZipFile(firmware) as archive:
             self.assertEqual(set(archive.namelist()), {*flash_release.PAYLOAD_NAMES, "SHA256SUMS"})
             self.assertTrue(all(info.date_time == (1980, 1, 1, 0, 0, 0) for info in archive.infolist()))

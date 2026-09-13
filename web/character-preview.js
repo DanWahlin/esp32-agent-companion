@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const names = ['Idle', 'Surprise', 'Working', 'Complete', 'Needs attention'];
+  const names = ['Idle', 'Surprise', 'Working', 'Complete', 'Needs attention', 'Sleeping'];
   const session = crypto.randomUUID();
   const canvas = document.getElementById('screen');
   const context = canvas.getContext('2d', {alpha: false});
@@ -31,7 +31,7 @@
   document.addEventListener('keydown', event => {
     if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.target.closest('input,select,textarea,[contenteditable="true"]')) return;
-    if (/^[1-5]$/.test(event.key)) { event.preventDefault(); signal(Number(event.key) - 1); }
+    if (/^[1-6]$/.test(event.key)) { event.preventDefault(); signal(Number(event.key) - 1); }
   });
   play.addEventListener('click', () => {
     playing = !playing; dirty = true; updatePlay(); last = performance.now();
@@ -132,7 +132,7 @@
   });
   const initialMode = new URLSearchParams(location.search).get('mode');
   if (initialMode !== null) {
-    const index = ['idle', 'surprise', 'working', 'complete', 'attention'].indexOf(initialMode);
+    const index = ['idle', 'surprise', 'working', 'complete', 'attention', 'sleep'].indexOf(initialMode);
     if (index < 0) { showError('Unknown character mode in this link.'); errorRequiresAction = true; }
     else signal(index);
   }
