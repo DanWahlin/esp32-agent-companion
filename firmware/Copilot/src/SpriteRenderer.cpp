@@ -30,6 +30,13 @@ SpriteRenderer::SpriteRenderer(uint16_t* firstOpenPatch, uint16_t* secondOpenPat
     : openPatches_{firstOpenPatch, secondOpenPatch}, patch_(patch),
       outputs_{firstOutput, secondOutput}, outputWidth_(outputWidth), outputHeight_(outputHeight), inflate_(inflate) {}
 
+void SpriteRenderer::invalidate() {
+  for (unsigned i = 0; i < 2; ++i) {
+    baseKeys_[i] = UINT32_MAX;
+    outputKeys_[i] = UINT32_MAX;
+  }
+}
+
 bool SpriteRenderer::decode(const SpriteBlock& block, uint16_t* output, size_t pixels, size_t width, size_t stride) {
   if (!block.size || block.offset > kSpriteDataSize || block.size > kSpriteDataSize - block.offset) {
     error_ = "Sprite block lies outside the embedded asset data.";

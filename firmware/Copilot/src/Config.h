@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 
 namespace copilot {
@@ -37,9 +38,16 @@ constexpr int kSdClock = 2;
 constexpr int kSdCommand = 1;
 constexpr int kSdData = 3;
 constexpr int kSdFrequencyKhz = 20000;
-constexpr unsigned kSdReadChunkBytes = 4096;
+constexpr unsigned kSdReadChunkBytes = 16384;
 constexpr unsigned kSdVerifyTimeoutMs = 30000;
-constexpr const char* kSdSpritePath = "/copilot/sprite-firmware.bin";
+constexpr unsigned kSdBlockWaitMs = 500;
+constexpr unsigned kSdReaderStopTimeoutMs = 2000;
+constexpr unsigned kOpenClawRenderStopTimeoutMs = 1000;
+constexpr const char* kOpenClawSpritePath = "/characters/openclaw/sprites.bin";
+constexpr const char* kOpenClawTempPath = "/characters/openclaw/sprites.tmp";
+constexpr const char* kOpenClawBackupPath = "/characters/openclaw/sprites.bak";
+constexpr unsigned kCharacterUploadTimeoutMs = 5000;
+constexpr size_t kCharacterUploadAckBytes = 256;
 constexpr float kHeadDelay = 0.09f;
 constexpr float kMoveMin = 1.15f;
 constexpr float kMoveMax = 1.65f;

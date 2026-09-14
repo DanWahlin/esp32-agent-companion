@@ -14,6 +14,7 @@ class SpriteRenderer {
                  uint16_t* firstOutput, uint16_t* secondOutput, InflateSprite inflate,
                  int outputWidth = kSpriteWidth, int outputHeight = kSpriteHeight);
   bool render(const SpritePose& pose, uint16_t* frame);
+  void invalidate();
   const char* error() const { return error_; }
   uint32_t decodeUs = 0, compositeUs = 0, eyesUs = 0;
 

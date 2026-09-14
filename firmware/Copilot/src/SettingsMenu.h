@@ -8,6 +8,8 @@ enum class SettingsAction : uint8_t {
   BrightnessUp,
   SoundDown,
   SoundUp,
+  CharacterCopilot,
+  CharacterOpenClaw,
   Idle,
   Surprise,
   Working,
@@ -48,12 +50,14 @@ class SettingsMenu {
       soundVolume_ = soundVolume_ < 75 ? soundVolume_ + 25 : 100;
       return SettingsAction::SoundUp;
     }
-    if (inside(x, y, 58, 244, 165, 40)) return SettingsAction::Idle;
-    if (inside(x, y, 243, 244, 165, 40)) return SettingsAction::Working;
-    if (inside(x, y, 58, 292, 165, 40)) return SettingsAction::Complete;
-    if (inside(x, y, 243, 292, 165, 40)) return SettingsAction::Attention;
-    if (inside(x, y, 58, 340, 165, 40)) return SettingsAction::Surprise;
-    if (inside(x, y, 243, 340, 165, 40)) return SettingsAction::Close;
+    if (inside(x, y, 58, 244, 165, 34)) return SettingsAction::CharacterCopilot;
+    if (inside(x, y, 243, 244, 165, 34)) return SettingsAction::CharacterOpenClaw;
+    if (inside(x, y, 58, 306, 165, 34)) return SettingsAction::Idle;
+    if (inside(x, y, 243, 306, 165, 34)) return SettingsAction::Working;
+    if (inside(x, y, 58, 344, 165, 34)) return SettingsAction::Complete;
+    if (inside(x, y, 243, 344, 165, 34)) return SettingsAction::Attention;
+    if (inside(x, y, 58, 382, 165, 34)) return SettingsAction::Surprise;
+    if (inside(x, y, 243, 382, 165, 34)) return SettingsAction::Close;
     return SettingsAction::None;
   }
 

@@ -66,6 +66,7 @@ jobs:
           bash tools/test.sh
           bash tools/test_sprite_cache.sh
           bash tools/test_sprite_renderer.sh
+          bash tools/test_openclaw_renderer.sh
           bash tools/test_character.sh
           bash tools/test_working_bits.sh
           bash tools/test_device_inputs.sh

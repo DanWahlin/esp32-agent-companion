@@ -31,6 +31,9 @@ class ReleaseBundleTests(unittest.TestCase):
         self.put("assets/sprite-firmware.bin", b"matched sprite pixels")
         self.put("assets/sprite-firmware.json", json.dumps(dict(
             dataBytes=21, dataSha256=hashlib.sha256(b"matched sprite pixels").hexdigest())))
+        self.put("assets/openclaw-lab.bin", b"openclaw sprite pixels")
+        self.put("assets/openclaw-lab.json", json.dumps(dict(
+            dataBytes=22, dataSha256=hashlib.sha256(b"openclaw sprite pixels").hexdigest())))
         for path in firmware_artifacts.BINARIES:
             self.put(path, b"compiled-" + path.name.encode())
         self.put("build/firmware/boot_app0.bin", b"\xff" * 8192)
@@ -76,9 +79,9 @@ class ReleaseBundleTests(unittest.TestCase):
             self.assertEqual(set(archive.namelist()), {*flash_release.PAYLOAD_NAMES, "SHA256SUMS"})
             self.assertTrue(all(info.date_time == (1980, 1, 1, 0, 0, 0) for info in archive.infolist()))
         with zipfile.ZipFile(sd) as archive:
-            self.assertEqual(archive.namelist(), ["copilot/sprite-firmware.bin"])
+            self.assertEqual(archive.namelist(), ["characters/openclaw/sprites.bin"])
             self.assertEqual(archive.read(archive.namelist()[0]),
-                             (extracted / "bin/sprite-firmware.bin").read_bytes())
+                             b"openclaw sprite pixels")
         self.assertEqual((firmware.parent / "SHA256SUMS").read_bytes(),
                          package_release.checksum_file(dict(zip((firmware.name, sd.name), original))))
         manifest = flash_release.verify_bundle(extracted)

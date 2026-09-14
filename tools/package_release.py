@@ -38,6 +38,13 @@ def package(root, version, name="esp32-agent-companion", output=None,
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository, flags=re.ASCII):
         raise ValueError("Repository must be an owner/repository pair.")
     firmware_artifacts.check(root)
+    openclaw_path = root / "assets/openclaw-lab.bin"
+    openclaw_metadata = json.loads((root / "assets/openclaw-lab.json").read_text())
+    openclaw_data = openclaw_path.read_bytes()
+    if (openclaw_metadata.get("dataBytes") != len(openclaw_data)
+            or openclaw_metadata.get("dataSha256") != sha256(openclaw_data)):
+        raise ValueError("OpenClaw SD pack does not match its metadata.")
+    openclaw_digest = sha256(openclaw_data)
     app, assets = firmware_artifacts.layout(root)
     sources = (
         "build/firmware/Copilot.ino.bootloader.bin",
@@ -83,8 +90,9 @@ def package(root, version, name="esp32-agent-companion", output=None,
         "Replace COM3 with your actual port, for example /dev/ttyACM0.\n"
         "Use a USB data cable. Type FLASH when prompted; --yes skips only this prompt.\n\n"
         f"{WARNING}\n\n"
-        "Optional SD card: extract the SD-card ZIP at the root of your card so the file is\n"
-        "copilot/sprite-firmware.bin. Keep this SD payload matched to this firmware release.\n"
+        "Optional OpenClaw character: extract the SD-card ZIP at the root of a FAT32 card so\n"
+        "the file is characters/openclaw/sprites.bin. Select OpenClaw from device Settings.\n"
+        "Keep this SD payload matched to this firmware release.\n"
         "The installer does not mount, format, or write any SD card.\n"
     ).encode("utf-8")
     # Recheck after reading so changes during packaging cannot create a mismatched release.
@@ -95,13 +103,15 @@ def package(root, version, name="esp32-agent-companion", output=None,
     for filename, source in zip(IMAGE_NAMES, sources):
         if sha256(files[filename]) != expected[source]:
             raise ValueError(f"Firmware changed while packaging: {source}.")
+    if sha256(openclaw_path.read_bytes()) != openclaw_digest:
+        raise ValueError("OpenClaw SD pack changed while packaging.")
     files["SHA256SUMS"] = checksum_file(files)
     output = Path(output) if output is not None else root / "build/release"
     output.mkdir(parents=True, exist_ok=True)
     firmware_zip = output / f"{name}-v{version}-firmware.zip"
     sd_zip = output / f"{name}-v{version}-sd-card.zip"
     write_zip(firmware_zip, files)
-    write_zip(sd_zip, {"copilot/sprite-firmware.bin": files[IMAGE_NAMES[-1]]})
+    write_zip(sd_zip, {"characters/openclaw/sprites.bin": openclaw_data})
     (output / "SHA256SUMS").write_bytes(checksum_file({
         firmware_zip.name: firmware_zip.read_bytes(), sd_zip.name: sd_zip.read_bytes(),
     }))

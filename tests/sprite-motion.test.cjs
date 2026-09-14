@@ -72,7 +72,8 @@ test('fractional timing keeps every pose boundary within one refresh of its ease
           elapsed += 1 / fps;
           if (player.index !== previous) {
             const travelled = phase === 'out' ? player.index : player.target - player.index;
-            const expected = duration * inverseQuintic(travelled / player.target);
+            const position = travelled / player.target;
+            const expected = duration * (direction === 'right' ? position : inverseQuintic(position));
             assert.ok(elapsed >= expected - 1e-9);
             assert.ok(elapsed - expected <= 1 / fps + 1e-9,
               `${direction} ${phase} at ${fps} Hz accumulated pose timing error`);
@@ -97,7 +98,7 @@ test('irregular refresh intervals preserve ordinary fractional time without a ca
     elapsed += delta;
     assert.ok(player.index - previous <= 1);
     if (previous !== player.index) {
-      const expected = player.duration * inverseQuintic(player.index / player.target);
+      const expected = player.duration * player.index / player.target;
       assert.ok(elapsed >= expected - 1e-9);
       assert.ok(elapsed - expected <= Math.max(...deltas) + 1e-9);
     }
@@ -235,7 +236,9 @@ test('random mode varies directions, holds, and depths without switching off cen
     const limit = player.direction === 'up' || player.direction === 'down' ? 11 : 23;
     assert.ok(player.target >= Math.round(.55 * limit) && player.target <= limit);
     directions.add(player.direction); targets.add(player.target);
-    until(player, p => p.phase === 'endpoint'); holds.add(player.hold);
+    until(player, p => p.phase === 'endpoint');
+    if (player.direction === 'right') assert.equal(player.hold, .001);
+    else holds.add(player.hold);
     until(player, p => p.phase === 'center'); holds.add(player.hold);
   }
   assert.equal(directions.size, DIRECTIONS.length);

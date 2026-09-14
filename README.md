@@ -19,7 +19,7 @@ built-in character.
 - **Natural motion:** smooth 30 FPS playback, eight looking directions, and occasional blinks.
 - **Touch reactions:** tap the character for a quick spring-like recoil and widened eyes,
   then return to Idle.
-- **On-device settings:** swipe up to adjust brightness, sound, or the character state.
+- **On-device settings:** swipe up to adjust brightness, sound, character, or state.
 - **Subtle sound cues:** original local cues accompany Working, Needs attention, Complete,
   Surprise, and settings actions when a speaker is attached.
 - **Agent states:** focused eyes and orbiting dots for Working, a celebration for Complete,
@@ -28,13 +28,12 @@ built-in character.
   with subtle movement, drowsy eyelids, and drifting Zs.
 - **Compact graphics:** lossless sprite compression preserves the artwork while keeping
   the current sprite pack around 9.53 MB.
-- **Optional microSD:** read-only loading of the matching sprite pack, with built-in
-  flash assets as the fallback.
+- **Optional OpenClaw character:** a validated, read-only microSD sprite pack can be
+  selected from Settings, with built-in Copilot assets as the automatic fallback.
 
 The character works immediately in automatic Idle mode. Agent states can be
 controlled through USB serial commands, the swipe-up settings menu, or the
-included Copilot CLI daemon. **Additional characters and wireless daemon
-transports are not implemented yet**.
+included Copilot CLI daemon. Wireless daemon transports are not implemented.
 
 ### Optional: Copilot CLI companion daemon
 
@@ -185,20 +184,38 @@ the microSD card.
 If the device is not listed, check that the cable supports data. For connection or
 download-mode problems, see the [Waveshare instructions](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75).
 
-### Optional: add a microSD card
+### Optional: add OpenClaw on microSD
 
-The built-in character already works without a card.
+The built-in Copilot character works without a card. OpenClaw uses microSD so
+both full-resolution packs do not compete for internal flash.
 
-1. Use a **FAT32** microSD card. A 64 GB FAT32 card has been mounted successfully.
-2. Download **`-sd-card.zip` from the same release** as your firmware.
-3. With a card reader, extract its `copilot` folder onto the card's root. The file
-   must be `/copilot/sprite-firmware.bin`.
-4. Safely eject the card, insert it with the device powered off, then restart.
+1. Insert a **FAT32** microSD card. A 64 GB FAT32 card has been tested.
+2. Connect the device to the Mac or Linux computer over USB.
+3. From the repository root, run:
 
-The firmware never formats or writes to the card, and the device does not expose
-it as a USB drive. Missing or incompatible packs leave flash playback available.
-This first implementation accepts the matching Copilot pack only; SD-backed
-playback performance still needs verification with that file present.
+   ```bash
+   npm --prefix daemon run install:openclaw
+   ```
+
+   Set `AGENT_COMPANION_PORT` or append
+   `-- --port /dev/cu.usbmodem2101` when automatic discovery is ambiguous.
+   An explicitly selected port must exist; the installer will not silently use
+   a different connected ESP32.
+   The Node installer pauses the local daemon, streams the pack to a temporary
+   SD file, verifies it on the device, atomically installs it, reboots, and
+   restarts the daemon.
+4. Swipe up on the display and choose **OpenClaw** under **Character**.
+
+The firmware never formats the card or writes during normal operation, and the
+device does not expose it as a USB drive. It writes only during an explicit Node installation. The
+transfer uses a temporary file and replaces the active pack only after validating
+its exact size and SHA-256. At boot the firmware validates the pack again before
+enabling its bounded PSRAM cache. Missing, incompatible, slow, or removed cards
+leave or return the device to built-in Copilot.
+
+As a manual fallback, download **`-sd-card.zip` from the same release**, extract
+its `characters` folder at the FAT32 card root, and reinsert the card while the
+device is powered off.
 
 ## Develop and customize
 
@@ -208,8 +225,11 @@ device. Source artwork, blink generation, and firmware export tools are included
 ### Character Lab
 
 Use Character Lab to review every character state and animation locally before
-uploading firmware to the device. It renders live RGB565 frames with the same C++
-motion, sprite, and effects code used by the ESP32. It requires Python 3.10+,
+uploading firmware to the device. Switch between Copilot and OpenClaw while
+preserving the same native 13-track motion contract, blink levels, and effects.
+OpenClaw is built offline from a procedural 3D model based on the official SVG
+and runs from a validated microSD pack on the device.
+Character Lab requires Python 3.10+,
 `clang++`, and zlib; see the [source-build guide](docs/build-from-source.md) for
 platform prerequisites.
 
@@ -220,8 +240,20 @@ python3 tools/serve_preview.py
 ```
 
 Then open [http://127.0.0.1:8765/character-preview.html](http://127.0.0.1:8765/character-preview.html).
-Each browser tab runs an isolated native renderer, with controls for pausing,
-playback speed, touch reactions, and each character state.
+Each browser tab runs an isolated native renderer, with controls for character
+selection, pausing, playback speed, touch reactions, and each character state.
+
+To regenerate the OpenClaw sprites after changing its 3D source model:
+
+```bash
+npm ci --prefix tools/openclaw
+npm run render --prefix tools/openclaw
+python3 tools/export_openclaw_lab.py
+```
+
+The export produces the committed, losslessly compressed RGB565 OpenClaw pack
+and firmware metadata. The individual intermediate PNG frames are generated
+locally and ignored.
 
 <p align="center">
   <img src="images/character-lab.webp" alt="Character Lab showing the native Copilot character preview and state controls" width="1000">

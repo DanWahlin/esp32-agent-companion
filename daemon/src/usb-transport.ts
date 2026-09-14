@@ -100,7 +100,7 @@ export class UsbTransport {
     this.#path = path;
     try {
       const info = await this.#request('i', line => line.startsWith('INFO protocol='));
-      if (!/^INFO protocol=1(?: |$)/.test(info)) {
+      if (!/^INFO protocol=[12](?: |$)/.test(info)) {
         throw new Error(`Unsupported device protocol: ${info}`);
       }
       console.log(`[usb] ${info}`);

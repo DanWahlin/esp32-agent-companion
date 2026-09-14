@@ -3,24 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Copilot · Character Lab</title>
+  <title>Character Lab</title>
   <link rel="stylesheet" href="/character-preview.css">
-  <script src="/character-preview.js" defer></script>
+  <script src="/character-preview.js?v=20260913-1" defer></script>
 </head>
 <body>
-  <header><a class="brand" href="/character-preview.html">◈ <strong>Copilot</strong> <span>Character Lab</span></a>
+  <header><a class="brand" href="/character-preview.html">◈ <strong>Agent Companion</strong> <span>Character Lab</span></a>
     <a href="/sprite-preview.html">Eight-direction study ↗</a></header>
   <main>
     <div class="intro"><div><p class="eyebrow">A little presence. A clearer signal.</p>
-      <h1>Same character.<br><span>A little more feeling.</span></h1></div>
-      <p class="intro-copy">The same C++ animation engine as the device.<br>Live native frames, displayed here.</p></div>
+      <h1>Pick a character.<br><span>Keep the same signals.</span></h1></div>
+      <p class="intro-copy">One C++ animation engine, multiple sprite packs.<br>Live native frames, displayed here.</p></div>
     <div class="layout">
       <section class="stage-panel" aria-label="Native character preview">
         <div class="stage-meta"><span class="badge">Native C++ · RGB565</span><span id="connection">Connecting…</span></div>
+        <fieldset class="character-picker"><legend>Character</legend>
+          <label><input type="radio" name="character" value="copilot" checked><span>Copilot</span></label>
+          <label><input type="radio" name="character" value="openclaw"><span>OpenClaw</span></label>
+        </fieldset>
         <div class="stage"><button id="character" class="device" type="button" aria-label="Surprise Copilot">
           <canvas id="screen" width="466" height="466" aria-label="Actual native character framebuffer"></canvas>
         </button></div>
         <div class="transport"><button id="play" type="button" disabled>Pause</button>
+          <button id="wave" type="button">Preview wave</button>
           <label class="rate">Speed <select id="speed" aria-label="Preview playback speed"><option value="1">1×</option><option value="0.5">½×</option><option value="0.25">¼×</option></select></label>
           <span>Click, tap, Enter or Space to say hello.</span></div>
         <dl class="telemetry">
@@ -46,12 +51,13 @@
         </section>
         <section class="notes"><h3>Presence without distraction</h3>
           <p>Working and Needs attention stay active until a new signal arrives. A surprise never answers a waiting question.</p>
-          <p>The new touch reaction briefly shrinks as its eyes widen, then makes a small spring rebound and settles in about 0.8 seconds once centered. It replaces the long double-take. Use ¼× to inspect the motion.</p>
+          <p>Copilot and OpenClaw use the same native motion state, discrete RGB565 sprite playback, blink levels, and effects. OpenClaw uses character-specific pacing tuned for its larger gestures and walk cycle.</p>
+          <p>The touch reaction briefly recoils, then makes a small spring rebound and settles in about 0.8 seconds once centered. Use ¼× to inspect the motion.</p>
           <p>Working eases from normal to focused eyes, occasionally looks slowly left or right, then refocuses. The balls now follow a 400 × 400 circular path with more space around the head. The binary streams remain; the three bottom dots are removed for a cleaner look.</p>
           <p>Needs attention alternates the larger eye and curious head tilt, pausing on each side and easing through center. The question badge stays visible while waiting.</p>
           <p>After two uninterrupted idle minutes, the character centers, closes its eyes, and sleeps for one minute while Zs drift upward. It then wakes and repeats the cycle after another two idle minutes.</p>
-          <p>One C++ motion engine, two persistent framebuffers. Effects touch only black background pixels; the generated face stays intact.</p>
-          <p>The spring touch reaction and 400 × 400 circular orbit are now deployed to the device, using the same motion and rendering code as this preview.</p>
+          <p>OpenClaw’s sprites are rendered offline from a beveled 3D model derived from the official SVG. The ESP32 never performs live 3D rendering.</p>
+          <p>One C++ motion engine, two persistent framebuffers. Effects touch only black background pixels; the sprite artwork stays intact.</p>
           <p id="assets">Checking exported artwork…</p>
         </section>
       </aside>

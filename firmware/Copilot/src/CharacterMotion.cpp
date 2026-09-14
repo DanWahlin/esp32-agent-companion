@@ -84,6 +84,24 @@ void CharacterMotion::surpriseToIdle() {
   setMode(CharacterMode::Surprise);
 }
 
+bool CharacterMotion::requestIdleDirection(int direction) {
+  if (next_ != CharacterMode::Idle) {
+    error_ = "Idle direction preview requires Idle mode.";
+    return false;
+  }
+  if (!idle_.returnToCenter(.25)) {
+    error_ = idle_.error();
+    return false;
+  }
+  if (!idle_.request(direction)) {
+    error_ = idle_.error();
+    return false;
+  }
+  idle_.setAutomatic(true);
+  error_ = nullptr;
+  return true;
+}
+
 CharacterState CharacterMotion::state() const {
   SpritePose pose = mode_ == CharacterMode::Idle ? idle_.pose() : pose_;
   if (mode_ == CharacterMode::Sleep) {

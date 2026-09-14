@@ -5,13 +5,17 @@
 #include <esp_timer.h>
 #include <esp_system.h>
 #include <miniz.h>
+#include <SD_MMC.h>
+#include <mbedtls/sha256.h>
 #include <algorithm>
 #include <cstring>
 #include <cstdarg>
 #include <atomic>
 #include "src/SpriteRenderer.h"
+#include "src/OpenClawSpriteRenderer.h"
 #include "src/SpritePredictor.h"
 #include "src/SpriteStorage.h"
+#include "src/Character.h"
 #include "src/CharacterMotion.h"
 #include "src/AudioPlayer.h"
 #include "src/CharacterEffects.h"
@@ -19,6 +23,7 @@
 #include "src/TouchInput.h"
 #include "src/SettingsMenu.h"
 #include "src/Motion.h"
+#include "generated/openclaw_assets.h"
 
 using namespace copilot;
 
@@ -27,7 +32,8 @@ Arduino_ESP32QSPI displayBus(12, 38, 4, 5, 6, 7);
 Arduino_CO5300 display(&displayBus, 39, 0, 466, 466, 6, 0, 0, 0);
 QueueHandle_t freeFrames, readyFrames, commands;
 TaskHandle_t renderTask;
-SpriteRenderer* renderer;
+SpriteRenderer* copilotRenderer;
+OpenClawSpriteRenderer* openClawRenderer;
 CharacterEffects* effects;
 tinfl_decompressor inflater;
 alignas(4) uint8_t inflateHistory[TINFL_LZ_DICT_SIZE];
@@ -36,16 +42,23 @@ uint32_t inflateTimeUs = 0, predictTimeUs = 0;
 constexpr size_t kTransferBytes = 4096;
 uint8_t* transferBuffer;
 std::atomic<uint32_t> droppedLogs{0};
+std::atomic<uint8_t> activeCharacter{static_cast<uint8_t>(CharacterId::Copilot)};
+std::atomic<uint8_t> selectedCharacter{static_cast<uint8_t>(CharacterId::Copilot)};
+portMUX_TYPE openClawRenderLock = portMUX_INITIALIZER_UNLOCKED;
+uint32_t openClawRenders = 0;
+bool openClawUploadPending = false;
 uint32_t worstPresentationGap = 0;
 bool captureInterrupted = false;
 SettingsMenu settings(kBrightness);
 constexpr char kPreferencesNamespace[] = "agent-companion";
 constexpr char kSoundPreference[] = "sound";
 constexpr char kSoundVolumePreference[] = "volume";
+constexpr char kCharacterPreference[] = "character";
 
 struct ModeRequest {
   CharacterMode mode = CharacterMode::Idle;
   bool returnToIdle = false;
+  int8_t character = -1;
 };
 
 void logMessage(const char* format, ...) {
@@ -105,6 +118,9 @@ bool inflatePose(uint8_t* output, size_t outputSize, const uint8_t* input, size_
 void animate(void*) {
   CharacterMotion motion(esp_random());
   if (motion.error()) fatal(motion.error());
+  bool switchPending = false;
+  CharacterId switchTarget = CharacterId::Copilot;
+  CharacterMode resumeMode = CharacterMode::Idle;
   int64_t previous = esp_timer_get_time();
   for (;;) {
     Frame* frame;
@@ -112,6 +128,14 @@ void animate(void*) {
     const int64_t start = esp_timer_get_time();
     ModeRequest command;
     while (xQueueReceive(commands, &command, 0) == pdTRUE) {
+      if (command.character >= 0) {
+        switchTarget = static_cast<CharacterId>(command.character);
+        resumeMode = command.mode;
+        switchPending = switchTarget
+            != static_cast<CharacterId>(activeCharacter.load(std::memory_order_relaxed));
+        if (switchPending && !motion.setMode(CharacterMode::Idle)) fatal(motion.error());
+        continue;
+      }
       if (command.mode == CharacterMode::Surprise) {
         if (command.returnToIdle) motion.surpriseToIdle();
         else motion.surprise();
@@ -120,24 +144,65 @@ void animate(void*) {
       }
       if (motion.error()) fatal(motion.error());
     }
-    motion.update((start - previous) / 1000000.0);
+    const CharacterId motionCharacter = static_cast<CharacterId>(
+        activeCharacter.load(std::memory_order_relaxed));
+    const double motionScale = motionCharacter == CharacterId::OpenClaw
+        ? kOpenClawMotionSpeed : 1.0;
+    motion.update((start - previous) / 1000000.0 * motionScale);
     frame->motionUs = esp_timer_get_time() - start;
     previous = start;
     frame->state = motion.state();
+    if (switchPending && frame->state.mode == CharacterMode::Idle
+        && frame->state.pose.index == 0) {
+      activeCharacter.store(static_cast<uint8_t>(switchTarget), std::memory_order_relaxed);
+      copilotRenderer->invalidate();
+      switchPending = false;
+      logMessage("CHARACTER active=%s\n", characterName(switchTarget));
+      if (resumeMode != CharacterMode::Idle && !motion.setMode(resumeMode)) fatal(motion.error());
+      frame->state = motion.state();
+    }
     const int64_t restoreStart = esp_timer_get_time();
     if (!effects->restore(frame->pixels)) fatal(effects->error());
     const uint32_t restoreUs = esp_timer_get_time() - restoreStart;
     inflateTimeUs = predictTimeUs = 0;
-    if (!renderer->render(frame->state.pose, frame->pixels)) {
-      fatal(renderer->error());
+    const CharacterId character = static_cast<CharacterId>(
+        activeCharacter.load(std::memory_order_relaxed));
+    bool renderOpenClaw = false;
+    if (character == CharacterId::OpenClaw) {
+      portENTER_CRITICAL(&openClawRenderLock);
+      if (!openClawUploadPending) {
+        ++openClawRenders;
+        renderOpenClaw = true;
+      }
+      portEXIT_CRITICAL(&openClawRenderLock);
+    }
+    bool rendered = renderOpenClaw && openClawAvailable()
+        && openClawRenderer->render(
+            frame->state.pose, frame->state.effectSeconds, frame->pixels);
+    if (renderOpenClaw) {
+      portENTER_CRITICAL(&openClawRenderLock);
+      --openClawRenders;
+      portEXIT_CRITICAL(&openClawRenderLock);
+    }
+    if (character == CharacterId::OpenClaw && !rendered) {
+      activeCharacter.store(static_cast<uint8_t>(CharacterId::Copilot), std::memory_order_relaxed);
+      selectedCharacter.store(static_cast<uint8_t>(CharacterId::Copilot), std::memory_order_relaxed);
+      copilotRenderer->invalidate();
+      logMessage("CHARACTER fallback=copilot reason=%s\n",
+                 openClawRenderer->error() ? openClawRenderer->error() : "SD unavailable");
+    }
+    if (character == CharacterId::Copilot || !rendered)
+      rendered = copilotRenderer->render(frame->state.pose, frame->pixels);
+    if (!rendered) {
+      fatal(copilotRenderer->error());
     }
     const int64_t effectStart = esp_timer_get_time();
     if (!effects->render(frame->state, frame->pixels)) fatal(effects->error());
     frame->effectsUs = restoreUs + esp_timer_get_time() - effectStart;
     frame->renderUs = esp_timer_get_time() - start;
-    frame->decodeUs = renderer->decodeUs;
-    frame->compositeUs = renderer->compositeUs;
-    frame->eyesUs = renderer->eyesUs;
+    frame->decodeUs = character == CharacterId::Copilot ? copilotRenderer->decodeUs : 0;
+    frame->compositeUs = character == CharacterId::Copilot ? copilotRenderer->compositeUs : 0;
+    frame->eyesUs = character == CharacterId::Copilot ? copilotRenderer->eyesUs : 0;
     frame->inflateUs = inflateTimeUs;
     frame->predictUs = predictTimeUs;
     xQueueSend(readyFrames, &frame, portMAX_DELAY);
@@ -178,10 +243,12 @@ bool captureFrame(const Frame& frame) {
   const int length = snprintf(header, sizeof(header),
       "CAPTURE_POSE direction=%u frame=%u blink=%u\n"
       "CAPTURE_STATE mode=%u requested=%u seconds=%.9g event=%u\n"
+      "CAPTURE_CHARACTER %s\n"
       "FRAME_BE %d %d %u\n",
       static_cast<unsigned>(frame.state.pose.direction), static_cast<unsigned>(frame.state.pose.index),
       static_cast<unsigned>(frame.state.pose.blinkLevel), static_cast<unsigned>(frame.state.mode),
       static_cast<unsigned>(frame.state.requestedMode), frame.state.effectSeconds, frame.state.eventId,
+      characterName(static_cast<CharacterId>(activeCharacter.load(std::memory_order_relaxed))),
       kCharacterFrameWidth, kCharacterFrameHeight, static_cast<unsigned>(bytes));
   if (length < 0 || static_cast<size_t>(length) >= sizeof(header)) {
     logMessage("CAPTURE_ERROR header formatting failed\n");
@@ -265,6 +332,170 @@ void saveSoundVolume(uint8_t volume) {
   preferences.end();
 }
 
+CharacterId loadCharacter() {
+  Preferences preferences;
+  if (!preferences.begin(kPreferencesNamespace, true)) {
+    logMessage("SETTINGS_ERROR character preference open failed\n");
+    return CharacterId::Copilot;
+  }
+  const uint8_t stored = preferences.getUChar(
+      kCharacterPreference, static_cast<uint8_t>(CharacterId::Copilot));
+  preferences.end();
+  if (stored > static_cast<uint8_t>(CharacterId::OpenClaw)) {
+    logMessage("SETTINGS_ERROR invalid character=%u\n", static_cast<unsigned>(stored));
+    return CharacterId::Copilot;
+  }
+  const CharacterId character = static_cast<CharacterId>(stored);
+  if (character == CharacterId::OpenClaw && !openClawAvailable()) {
+    logMessage("CHARACTER stored=openclaw unavailable; using=copilot\n");
+    return CharacterId::Copilot;
+  }
+  return character;
+}
+
+void saveCharacter(CharacterId character) {
+  Preferences preferences;
+  if (!preferences.begin(kPreferencesNamespace, false)) {
+    logMessage("SETTINGS_ERROR character preference open failed\n");
+    return;
+  }
+  if (preferences.putUChar(kCharacterPreference, static_cast<uint8_t>(character)) != 1)
+    logMessage("SETTINGS_ERROR character preference write failed\n");
+  preferences.end();
+}
+
+void sendUploadMessage(const char* message) {
+  writeCapture(reinterpret_cast<const uint8_t*>(message), std::strlen(message));
+}
+
+void restartAfterUploadError(const char* message) {
+  SD_MMC.remove(kOpenClawTempPath);
+  sendUploadMessage(message);
+  delay(250);
+  ESP.restart();
+}
+
+void installOpenClawFromUsb() {
+  portENTER_CRITICAL(&openClawRenderLock);
+  openClawUploadPending = true;
+  activeCharacter.store(static_cast<uint8_t>(CharacterId::Copilot), std::memory_order_relaxed);
+  selectedCharacter.store(static_cast<uint8_t>(CharacterId::Copilot), std::memory_order_relaxed);
+  portEXIT_CRITICAL(&openClawRenderLock);
+  copilotRenderer->invalidate();
+  const uint32_t renderStopStarted = millis();
+  for (;;) {
+    portENTER_CRITICAL(&openClawRenderLock);
+    const bool stopped = openClawRenders == 0;
+    portEXIT_CRITICAL(&openClawRenderLock);
+    if (stopped) break;
+    if (millis() - renderStopStarted > kOpenClawRenderStopTimeoutMs)
+      restartAfterUploadError("UPLOAD_ERROR renderer_busy\n");
+    delay(1);
+  }
+  if (!prepareOpenClawUpdate())
+    restartAfterUploadError("UPLOAD_ERROR sd_unavailable\n");
+  SD_MMC.mkdir("/characters");
+  SD_MMC.mkdir("/characters/openclaw");
+  SD_MMC.remove(kOpenClawTempPath);
+  File output = SD_MMC.open(kOpenClawTempPath, FILE_WRITE);
+  if (!output || output.isDirectory())
+    restartAfterUploadError("UPLOAD_ERROR temporary_file\n");
+
+  char ready[64];
+  const int readyLength = snprintf(
+      ready, sizeof(ready), "UPLOAD_READY bytes=%u\n",
+      static_cast<unsigned>(kOpenClawDataSize));
+  if (readyLength <= 0 || static_cast<size_t>(readyLength) >= sizeof(ready)
+      || !writeCapture(reinterpret_cast<const uint8_t*>(ready), readyLength)) {
+    output.close();
+    restartAfterUploadError("UPLOAD_ERROR usb_ready\n");
+  }
+
+  mbedtls_sha256_context hash;
+  mbedtls_sha256_init(&hash);
+  bool good = mbedtls_sha256_starts(&hash, 0) == 0;
+  size_t received = 0;
+  size_t nextAcknowledgement = std::min<size_t>(
+      kCharacterUploadAckBytes, kOpenClawDataSize);
+  uint32_t progress = millis();
+  Serial.setTimeout(100);
+  while (good && received < kOpenClawDataSize) {
+    const size_t requested = std::min<size_t>(
+        kCharacterUploadAckBytes, kOpenClawDataSize - received);
+    const size_t count = Serial.readBytes(
+        reinterpret_cast<char*>(transferBuffer), requested);
+    if (count) {
+      good = output.write(transferBuffer, count) == count
+          && mbedtls_sha256_update(&hash, transferBuffer, count) == 0;
+      received += count;
+      progress = millis();
+      if (received >= nextAcknowledgement) {
+        char acknowledgement[64];
+        const int length = snprintf(
+            acknowledgement, sizeof(acknowledgement),
+            "UPLOAD_ACK received=%u\n", static_cast<unsigned>(received));
+        if (length <= 0 || static_cast<size_t>(length) >= sizeof(acknowledgement)
+            || !writeCapture(reinterpret_cast<const uint8_t*>(acknowledgement), length)) {
+          good = false;
+        }
+        nextAcknowledgement = std::min<size_t>(
+            nextAcknowledgement + kCharacterUploadAckBytes, kOpenClawDataSize);
+      }
+      yield();
+    } else if (millis() - progress > kCharacterUploadTimeoutMs) {
+      good = false;
+    }
+  }
+  uint8_t digest[32] = {};
+  const int finishStatus = mbedtls_sha256_finish(&hash, digest);
+  const bool digestMatches = finishStatus == 0
+      && std::memcmp(digest, kOpenClawDataSha256, sizeof(digest)) == 0;
+  good = good && received == kOpenClawDataSize && digestMatches;
+  mbedtls_sha256_free(&hash);
+  output.flush();
+  output.close();
+  if (!good) {
+    char detail[160];
+    char digestHex[65];
+    for (size_t i = 0; i < sizeof(digest); ++i)
+      snprintf(digestHex + i * 2, 3, "%02x", digest[i]);
+    snprintf(detail, sizeof(detail),
+             "UPLOAD_ERROR validation received=%u expected=%u hash=%s finish=%d\n",
+             static_cast<unsigned>(received), static_cast<unsigned>(kOpenClawDataSize),
+             digestHex, finishStatus);
+    restartAfterUploadError(detail);
+  }
+
+  SD_MMC.remove(kOpenClawBackupPath);
+  const bool hadExisting = SD_MMC.exists(kOpenClawSpritePath);
+  if (hadExisting && !SD_MMC.rename(kOpenClawSpritePath, kOpenClawBackupPath))
+    restartAfterUploadError("UPLOAD_ERROR backup\n");
+  if (!SD_MMC.rename(kOpenClawTempPath, kOpenClawSpritePath)) {
+    if (hadExisting) SD_MMC.rename(kOpenClawBackupPath, kOpenClawSpritePath);
+    restartAfterUploadError("UPLOAD_ERROR install\n");
+  }
+  if (hadExisting) SD_MMC.remove(kOpenClawBackupPath);
+  saveCharacter(CharacterId::OpenClaw);
+  sendUploadMessage("UPLOAD_OK character=openclaw rebooting\n");
+  delay(250);
+  ESP.restart();
+}
+
+void queueCharacter(CharacterId character, CharacterMode resumeMode) {
+  if (character == CharacterId::OpenClaw && !openClawAvailable()) {
+    logMessage("CHARACTER unavailable=openclaw\n");
+    return;
+  }
+  const ModeRequest request{resumeMode, false, static_cast<int8_t>(character)};
+  if (xQueueSend(commands, &request, 0) != pdTRUE) {
+    logMessage("COMMAND_ERROR character queue full\n");
+    return;
+  }
+  selectedCharacter.store(static_cast<uint8_t>(character), std::memory_order_relaxed);
+  saveCharacter(character);
+  logMessage("CHARACTER requested=%s\n", characterName(character));
+}
+
 void queueModeCue(CharacterMode mode) {
   switch (mode) {
     case CharacterMode::Working: queueAudioCue(AudioCue::Working); break;
@@ -310,8 +541,8 @@ void drawSettingsMenu(CharacterMode selected) {
   constexpr uint16_t muted = 0x8C71;
   display.fillScreen(0);
   drawSettingsTitle(text);
-  display.fillRoundRect(38, 92, 390, 312, 28, panel);
-  display.drawRoundRect(38, 92, 390, 312, 28, 0x31CC);
+  display.fillRoundRect(38, 92, 390, 336, 28, panel);
+  display.drawRoundRect(38, 92, 390, 336, 28, 0x31CC);
   display.setTextColor(text);
   display.setTextSize(2);
   display.setCursor(173, 96);
@@ -347,15 +578,24 @@ void drawSettingsMenu(CharacterMode selected) {
   display.print(volume);
   display.setTextColor(text);
   display.setTextSize(2);
-  display.setCursor(143, 222);
+  display.setCursor(185, 222);
+  display.print("Character");
+  const CharacterId character = static_cast<CharacterId>(
+      selectedCharacter.load(std::memory_order_relaxed));
+  drawSettingsButton(58, 244, 165, "Copilot", character == CharacterId::Copilot, 2, 34);
+  drawSettingsButton(243, 244, 165, openClawAvailable() ? "OpenClaw" : "No SD pack",
+                     character == CharacterId::OpenClaw, openClawAvailable() ? 2 : 1, 34);
+  display.setTextColor(text);
+  display.setTextSize(2);
+  display.setCursor(143, 286);
   display.print("Character state");
-  drawSettingsButton(58, 244, 165, "Idle", selected == CharacterMode::Idle, 2, 40);
-  drawSettingsButton(243, 244, 165, "Working", selected == CharacterMode::Working, 2, 40);
-  drawSettingsButton(58, 292, 165, "Complete", selected == CharacterMode::Complete, 2, 40);
-  drawSettingsButton(243, 292, 165, "Needs attention",
-                     selected == CharacterMode::Attention, 1, 40);
-  drawSettingsButton(58, 340, 165, "Surprise", selected == CharacterMode::Surprise, 2, 40);
-  drawSettingsButton(243, 340, 165, "Close", false, 2, 40);
+  drawSettingsButton(58, 306, 165, "Idle", selected == CharacterMode::Idle, 2, 34);
+  drawSettingsButton(243, 306, 165, "Working", selected == CharacterMode::Working, 2, 34);
+  drawSettingsButton(58, 344, 165, "Complete", selected == CharacterMode::Complete, 2, 34);
+  drawSettingsButton(243, 344, 165, "Needs attention",
+                     selected == CharacterMode::Attention, 1, 34);
+  drawSettingsButton(58, 382, 165, "Surprise", selected == CharacterMode::Surprise, 2, 34);
+  drawSettingsButton(243, 382, 165, "Close", false, 2, 34);
 }
 
 void clearCharacterMargins() {
@@ -407,6 +647,16 @@ void handleTouchGesture(const TouchGesture& gesture, const Frame& frame) {
       logMessage("SETTINGS sound_volume=%u\n",
                  static_cast<unsigned>(settings.soundVolume()));
       break;
+    case SettingsAction::CharacterCopilot:
+      queueCharacter(CharacterId::Copilot, frame.state.requestedMode);
+      queueAudioCue(AudioCue::Settings);
+      drawSettingsMenu(frame.state.requestedMode);
+      break;
+    case SettingsAction::CharacterOpenClaw:
+      queueCharacter(CharacterId::OpenClaw, frame.state.requestedMode);
+      queueAudioCue(AudioCue::Settings);
+      drawSettingsMenu(frame.state.requestedMode);
+      break;
     case SettingsAction::Idle:
       settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Idle); break;
     case SettingsAction::Surprise:
@@ -445,13 +695,18 @@ void processCommand(DeviceCommand command, const Frame& frame) {
       break;
     case DeviceCommand::Info:
       logMessage("INFO protocol=%u uptime_ms=%llu reset_reason=%u mode=%s requested=%s assets=%u "
-                 "max_gap_us=%u dropped_logs=%u audio_ready=%u sound_volume=%u\n",
+                 "max_gap_us=%u dropped_logs=%u audio_ready=%u sound_volume=%u character=%s\n",
                     kDeviceProtocol, static_cast<unsigned long long>(esp_timer_get_time() / 1000),
                     static_cast<unsigned>(esp_reset_reason()), modeName(frame.state.mode),
                     modeName(frame.state.requestedMode), kSpriteDataSize, worstPresentationGap,
                     droppedLogs.load(std::memory_order_relaxed), static_cast<unsigned>(audioReady()),
-                    static_cast<unsigned>(soundVolume()));
+                    static_cast<unsigned>(soundVolume()),
+                    characterName(static_cast<CharacterId>(
+                        activeCharacter.load(std::memory_order_relaxed))));
       logSdStatus(sdSpriteStatus());
+      break;
+    case DeviceCommand::UploadOpenClaw:
+      installOpenClawFromUsb();
       break;
     default: queueMode(command); break;
   }
@@ -471,11 +726,15 @@ void setup() {
   display.setBrightness(0);
   display.fillScreen(0);
   if (!initializeSpriteStorage()) fatal(spriteStorageError());
+  initializeSdSpriteStorage();
   if (!initializeTouchInput()) fatal(touchInputError());
   const uint8_t storedSoundVolume = loadSoundVolume();
   settings.setSoundVolume(storedSoundVolume);
   setSoundVolume(storedSoundVolume);
   beginAudio();
+  const CharacterId storedCharacter = loadCharacter();
+  activeCharacter.store(static_cast<uint8_t>(storedCharacter), std::memory_order_relaxed);
+  selectedCharacter.store(static_cast<uint8_t>(storedCharacter), std::memory_order_relaxed);
   transferBuffer = static_cast<uint8_t*>(heap_caps_aligned_alloc(
       16, kTransferBytes, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
   if (!transferBuffer) fatal("DMA staging allocation failed.");
@@ -486,7 +745,15 @@ void setup() {
       "Second open-eye cache SRAM allocation failed."));
   auto* patch = static_cast<uint16_t*>(allocate(patchBytes, MALLOC_CAP_INTERNAL,
       "Blink patch SRAM allocation failed."));
-  void* memory = allocate(sizeof(SpriteRenderer), MALLOC_CAP_INTERNAL, "Renderer allocation failed.");
+  void* memory = allocate(sizeof(SpriteRenderer), MALLOC_CAP_INTERNAL, "Copilot renderer allocation failed.");
+  void* openClawMemory = allocate(
+      sizeof(OpenClawSpriteRenderer), MALLOC_CAP_INTERNAL, "OpenClaw renderer allocation failed.");
+  auto* openClawScratch = static_cast<uint16_t*>(allocate(
+      kCharacterFrameWidth * kFrameHeight * sizeof(uint16_t), MALLOC_CAP_SPIRAM,
+      "OpenClaw blink buffer allocation failed."));
+  auto* openClawCached = static_cast<uint16_t*>(allocate(
+      kCharacterFrameWidth * kCharacterFrameHeight * sizeof(uint16_t), MALLOC_CAP_SPIRAM,
+      "OpenClaw decoded frame cache allocation failed."));
   freeFrames = xQueueCreate(2, sizeof(Frame*));
   readyFrames = xQueueCreate(2, sizeof(Frame*));
   commands = xQueueCreate(8, sizeof(ModeRequest));
@@ -498,19 +765,26 @@ void setup() {
     Frame* pointer = &frame;
     xQueueSend(freeFrames, &pointer, portMAX_DELAY);
   }
-  renderer = new (memory) SpriteRenderer(firstOpenPatch, secondOpenPatch, patch,
-                                        frames[0].pixels, frames[1].pixels, inflatePose,
-                                        kCharacterFrameWidth, kCharacterFrameHeight);
+  copilotRenderer = new (memory) SpriteRenderer(firstOpenPatch, secondOpenPatch, patch,
+                                                frames[0].pixels, frames[1].pixels, inflatePose,
+                                                kCharacterFrameWidth, kCharacterFrameHeight);
+  openClawRenderer = new (openClawMemory) OpenClawSpriteRenderer(
+      openClawScratch, openClawCached, inflatePose);
   void* effectMemory = allocate(sizeof(CharacterEffects), MALLOC_CAP_INTERNAL, "Effects allocation failed.");
   effects = new (effectMemory) CharacterEffects(frames[0].pixels, frames[1].pixels);
   // Warm both frame caches before starting the presentation clock and brightness fade.
-  for (auto& frame : frames)
-    if (!renderer->render({0, 0, 0}, frame.pixels)) fatal(renderer->error());
-  initializeSdSpriteStorage();
+  for (auto& frame : frames) {
+    const bool rendered = storedCharacter == CharacterId::OpenClaw
+        ? openClawRenderer->render({0, 0, 0}, 0, frame.pixels)
+        : copilotRenderer->render({0, 0, 0}, frame.pixels);
+    if (!rendered) fatal(storedCharacter == CharacterId::OpenClaw
+        ? openClawRenderer->error() : copilotRenderer->error());
+  }
   if (xTaskCreatePinnedToCore(animate, "copilot-render", 16384, nullptr, 1,
                               &renderTask, 0) != pdPASS) fatal("Render task creation failed.");
-  logMessage("READY: %dx%d, target %d fps, sprites=%u bytes, %d poses, %d tracks\n",
-                kDisplaySize, kDisplaySize, kTargetFps, kSpriteDataSize, kSpriteFrameCount, kSpriteDirections);
+  logMessage("READY: %dx%d, target %d fps, sprites=%u bytes, %d poses, %d tracks character=%s\n",
+             kDisplaySize, kDisplaySize, kTargetFps, kSpriteDataSize, kSpriteFrameCount,
+             kSpriteDirections, characterName(storedCharacter));
 }
 
 void loop() {

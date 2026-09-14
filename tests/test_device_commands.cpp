@@ -20,6 +20,7 @@ int main() {
   assert(send(parser, "s") == DeviceCommand::Capture);
   assert(send(parser, "h") == DeviceCommand::Heap);
   assert(send(parser, "i") == DeviceCommand::Info);
+  assert(send(parser, "u") == DeviceCommand::UploadOpenClaw);
   assert(send(parser, "\n") == DeviceCommand::None);
   assert(send(parser, "x") == DeviceCommand::Invalid);
   assert(send(parser, "!not-a-mode\n") == DeviceCommand::Invalid);

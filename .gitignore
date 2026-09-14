@@ -1,6 +1,8 @@
 build/
 daemon/dist/
 daemon/node_modules/
+tools/openclaw/node_modules/
+web/openclaw-sprites/
 .deps/
 .venv/
 __pycache__/

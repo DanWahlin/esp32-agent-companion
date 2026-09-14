@@ -121,7 +121,8 @@ static void tracksAndTiming() {
           elapsed += dt;
           if (old != p.pose().index) {
             const int travelled = phase == Phase::Out ? p.pose().index : p.target() - p.pose().index;
-            const double expected = duration * inverse(double(travelled) / p.target());
+            const double position = double(travelled) / p.target();
+            const double expected = duration * (direction == 0 ? position : inverse(position));
             assert(elapsed >= expected - 1e-9);
             assert(elapsed - expected <= (fps ? refresh : 1.0 / 45) + 1e-9);
           }
@@ -150,7 +151,7 @@ static void queueCycleAndControls() {
     until(p, [](const auto& q) { return q.phase() == Phase::Out; });
     assert(p.pose().direction == i % 8 && p.target() == limit(p));
     until(p, [](const auto& q) { return q.phase() == Phase::Endpoint; });
-    assert(p.hold() == .6);
+    assert(p.hold() == (p.pose().direction == 0 ? .001 : .6));
     until(p, [](const auto& q) { return q.phase() == Phase::Center; });
     assert(p.hold() == .6);
   }
@@ -205,8 +206,9 @@ static void edgeCacheInputs() {
           const int travelled = phase == Phase::Out ? p.pose().index : p.target() - p.pose().index;
           const double before = double(travelled) / p.target();
           const double after = double(travelled + 1) / p.target();
+          const bool usesEasing = eased && p.pose().direction != 0;
           const double interval = duration * std::sqrt(double(p.target()) / (p.frameCount() - 1))
-              * (eased ? inverse(after) - inverse(before) : after - before);
+              * (usesEasing ? inverse(after) - inverse(before) : after - before);
           for (int i = 0; i < 3; ++i) {
             const auto oldIndex = p.pose().index;
             const double expected = p.progress() + .000001 / interval;
@@ -324,8 +326,12 @@ static void randomnessAndNoHeap() {
     directions.insert(p.pose().direction);
     targets.insert(p.target());
     until(p, [](const auto& q) { return q.phase() == Phase::Endpoint; });
-    assert(p.hold() >= .35 && p.hold() <= 1.4);
-    holds.insert(p.hold());
+    if (p.pose().direction == 0) {
+      assert(p.hold() == .001);
+    } else {
+      assert(p.hold() >= .35 && p.hold() <= 1.4);
+      holds.insert(p.hold());
+    }
     until(p, [](const auto& q) { return q.phase() == Phase::Center; });
     assert(p.hold() >= .35 && p.hold() <= 1.6);
     holds.insert(p.hold());

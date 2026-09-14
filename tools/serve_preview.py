@@ -109,18 +109,26 @@ class NativeCharacterRenderer(NativeRenderer):
         delta = payload.get("delta", 0)
         mode = payload.get("mode", -1)
         playing = payload.get("playing", True)
+        character = payload.get("character", "copilot")
+        direction = payload.get("direction", -1)
         if type(delta) not in (int, float) or not math.isfinite(delta) or not 0 <= delta <= 86400:
             raise ValueError("delta must be a finite number between zero and 86400.")
         if type(mode) is not int or not -1 <= mode <= 5:
             raise ValueError("Character mode must be -1 (unchanged) or 0..5.")
         if type(playing) is not bool:
             raise ValueError("playing must be a boolean.")
+        if character not in ("copilot", "openclaw"):
+            raise ValueError("Character must be copilot or openclaw.")
+        if type(direction) is not int or not -1 <= direction <= 7:
+            raise ValueError("Direction must be -1 (automatic) or 0..7.")
         if not self.lock.acquire(blocking=False):
             raise RuntimeError("A frame is already in flight for this character session.")
         try:
             if self.process.poll() is not None:
                 raise RuntimeError("Character renderer is no longer running.")
-            self.process.stdin.write(f"{delta:.12f} {mode} {int(playing)}\n".encode("ascii"))
+            character_id = 0 if character == "copilot" else 1
+            self.process.stdin.write(
+                f"{delta:.12f} {mode} {int(playing)} {character_id} {direction}\n".encode("ascii"))
             deadline = time.monotonic() + 5
             header = bytearray()
             while not header.endswith(b"\n") and len(header) < 1024:
@@ -193,6 +201,10 @@ def main():
         def __init__(self, *arguments, **keywords):
             super().__init__(*arguments, directory=str(ROOT / "web"), **keywords)
 
+        def end_headers(self):
+            self.send_header("Cache-Control", "no-store")
+            super().end_headers()
+
         def log_message(self, format_string, *arguments):
             if self.command != "POST" or len(arguments) < 2 or str(arguments[1]) != "200":
                 super().log_message(format_string, *arguments)
@@ -228,7 +240,6 @@ def main():
             self.send_response(200)
             self.send_header("Content-Type", "application/octet-stream")
             self.send_header("Content-Length", str(len(pixels)))
-            self.send_header("Cache-Control", "no-store")
             for key, value in metadata.items():
                 self.send_header(f"X-Copilot-{key}", value)
             self.end_headers()

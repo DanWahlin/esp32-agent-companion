@@ -24,6 +24,7 @@ class CharacterMotion {
   bool setMode(CharacterMode mode);
   void surprise();
   void surpriseToIdle();
+  bool requestIdleDirection(int direction);
   CharacterState state() const;
   const char* error() const { return error_; }
   void setPlaying(bool value) { playing_ = value; }

@@ -38,7 +38,7 @@ An optional `COPILOT_SESSION_ID` adds Copilot attribution/session trailers.
 | Asset | Purpose |
 | --- | --- |
 | `<repo>-v<version>-firmware.zip` | Python installer, checksums, and all matching flash `.bin` files |
-| `<repo>-v<version>-sd-card.zip` | Optional `copilot/sprite-firmware.bin` for a FAT32 card |
+| `<repo>-v<version>-sd-card.zip` | Optional `characters/openclaw/sprites.bin` for a FAT32 card |
 | `SHA256SUMS` | Checksums for the downloadable ZIP files |
 
 The installer validates the included files and writes each at its declared
@@ -46,9 +46,9 @@ address. It does not use `erase-flash`, pad a merged image over NVS, or modify t
 SD card. A different existing firmware may use a different partition layout, so
 users should back up its data before installing.
 
-The SD file is intentionally paired with its firmware: pose tables and expected
-sprite SHA256 are compiled into the application. A mismatched card pack is
-rejected in favor of the built-in flash copy.
+The OpenClaw SD file is intentionally paired with its firmware: pose tables and
+the expected size and SHA256 are compiled into the application. A mismatched
+card pack is rejected in favor of built-in Copilot.
 
 ## Build release bundles locally
 

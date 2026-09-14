@@ -1,7 +1,9 @@
 #include "../firmware/Copilot/src/CharacterEffects.h"
+#include "../firmware/Copilot/src/Character.h"
 #include "../firmware/Copilot/src/SpriteRenderer.h"
 #include "../firmware/Copilot/src/SpriteStorage.h"
 #include "HostSpriteInflate.h"
+#include "../firmware/Copilot/src/OpenClawSpriteRenderer.h"
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -19,10 +21,14 @@ int main() {
   std::vector<uint16_t> first(kCharacterFrameWidth * kCharacterFrameHeight), second(first.size());
   std::vector<uint16_t> openFirst(kSpriteMaxPatchPixels), openSecond(kSpriteMaxPatchPixels);
   std::vector<uint16_t> patch(kSpriteMaxPatchPixels);
+  std::vector<uint16_t> openClawScratch(kCharacterFrameWidth * kFrameHeight);
+  std::vector<uint16_t> openClawCached(kCharacterFrameWidth * kCharacterFrameHeight);
   SpriteRenderer renderer(openFirst.data(), openSecond.data(), patch.data(),
                           first.data(), second.data(), inflateSpriteHost,
                           kCharacterFrameWidth, kCharacterFrameHeight);
   CharacterEffects effects(first.data(), second.data());
+  OpenClawSpriteRenderer openClaw(
+      openClawScratch.data(), openClawCached.data(), inflateSpriteHost);
   CharacterMotion motion(20260911);
   if (motion.error()) {
     std::cerr << motion.error() << '\n';
@@ -32,29 +38,42 @@ int main() {
   char line[256];
   while (std::cin.getline(line, sizeof(line))) {
     double dt;
-    double requestedMode, requestedPlaying;
+    double requestedMode, requestedPlaying, requestedCharacter, requestedDirection;
     int consumed = 0;
-    if (std::sscanf(line, "%lf %lf %lf %n", &dt, &requestedMode, &requestedPlaying, &consumed) != 3
+    if (std::sscanf(line, "%lf %lf %lf %lf %lf %n", &dt, &requestedMode,
+                    &requestedPlaying, &requestedCharacter, &requestedDirection, &consumed) != 5
         || line[consumed] != '\0' || !std::isfinite(dt) || dt < 0 || dt > 86400
         || !std::isfinite(requestedMode) || requestedMode < -1 || requestedMode > 5
         || std::floor(requestedMode) != requestedMode
-        || !std::isfinite(requestedPlaying) || (requestedPlaying != 0 && requestedPlaying != 1)) {
+        || !std::isfinite(requestedPlaying) || (requestedPlaying != 0 && requestedPlaying != 1)
+        || !std::isfinite(requestedCharacter) || (requestedCharacter != 0 && requestedCharacter != 1)
+        || !std::isfinite(requestedDirection) || requestedDirection < -1 || requestedDirection > 7
+        || std::floor(requestedDirection) != requestedDirection) {
       std::cout << "ERR Invalid character command\n" << std::flush;
       continue;
     }
     const int mode = static_cast<int>(requestedMode), playing = static_cast<int>(requestedPlaying);
+    const int character = static_cast<int>(requestedCharacter);
     if (mode >= 0 && !motion.setMode(static_cast<CharacterMode>(mode))) {
       std::cout << "ERR " << motion.error() << '\n' << std::flush;
       continue;
     }
+    if (requestedDirection >= 0
+        && !motion.requestIdleDirection(static_cast<int>(requestedDirection))) {
+      std::cout << "ERR " << motion.error() << '\n' << std::flush;
+      continue;
+    }
     motion.setPlaying(playing != 0);
-    motion.update(dt);
+    motion.update(dt * (character == 1 ? kOpenClawMotionSpeed : 1.0));
     const CharacterState state = motion.state();
     uint16_t* frame = useFirst ? first.data() : second.data();
     const auto start = std::chrono::steady_clock::now();
-    if (!effects.restore(frame) || !renderer.render(state.pose, frame)
-        || !effects.render(state, frame)) {
-      std::cout << "ERR " << (effects.error() ? effects.error() : renderer.error()) << '\n' << std::flush;
+    const bool restored = effects.restore(frame);
+    const bool rendered = character == 0 ? renderer.render(state.pose, frame)
+                                         : openClaw.render(state.pose, state.effectSeconds, frame);
+    if (!restored || !rendered || !effects.render(state, frame)) {
+      const char* renderError = character == 0 ? renderer.error() : openClaw.error();
+      std::cout << "ERR " << (effects.error() ? effects.error() : renderError) << '\n' << std::flush;
       continue;
     }
     const double renderMs = std::chrono::duration<double, std::milli>(

@@ -103,26 +103,41 @@ artwork or flash layout.
 The board's TF/microSD slot uses SD_MMC in 1-bit mode: CLK GPIO2, CMD GPIO1,
 and D0 GPIO3, at 20 MHz. A FAT32 card is mounted at boot with automatic formatting
 explicitly disabled. This firmware never creates, changes, deletes, or formats
-files on the card. It does not expose the card as a USB drive.
+files during normal operation and does not expose the card as a USB drive.
 
-The built-in flash sprites remain the reliable default. An optional card pack
-must be located at **`/copilot/sprite-firmware.bin`** and match the compiled
-payload's exact size and SHA256. This first version accepts the matching Copilot
-export, not arbitrary PNGs or additional character packs; a character catalog
-remains follow-up work.
+The built-in Copilot flash sprites remain the reliable default. The optional
+OpenClaw pack must be located at
+**`/characters/openclaw/sprites.bin`** and match the size and SHA256 compiled
+into the firmware. Arbitrary PNGs and unrecognized character packs are rejected.
 
-To prepare the card, copy the `copilot` folder from
-`build/sd-card/` to the card's root using a card reader. That staged folder
-contains the current `assets/sprite-firmware.bin`; regenerate/copy it again after
-changing sprite assets. Eject the card safely, insert it with the device powered
-off, then restart the device. No JSON file is needed on the card because this
-version uses the matching firmware's compiled pose tables.
+The preferred installation path keeps the card in the device:
 
-The 9.53 MB pack does not fit entirely in PSRAM. A bounded 512 KiB compressed-data
-cache prefetches overlapping windows on a low-priority reader task. Rendering
-never waits for card I/O: cache misses use the identical verified flash bytes.
-Leases protect cached pages while decoding, and each fetched window is checked
-against flash before publication. This deliberately retains the flash pack;
+```bash
+npm --prefix daemon run install:openclaw
+```
+
+The Node CLI temporarily pauses the installed daemon, negotiates device protocol
+2, streams `assets/openclaw-lab.bin`, and waits for the firmware to validate and
+atomically rename the temporary file. Interrupted or invalid transfers do not
+replace an existing pack. The device reboots after each attempt so SD cache state
+cannot survive a replacement.
+
+As a manual fallback, extract the release's `-sd-card.zip` at the card root with
+a card reader. No JSON file is needed because the matching firmware contains the
+validated frame table and expected digest.
+
+The OpenClaw pack does not fit entirely in PSRAM. Its generated layout groups
+the normal open-eye frames first, allowing that 2.0 MiB hot region to be loaded
+into PSRAM while the pack is verified at boot. Ordinary movement therefore does
+not wait for the card. A separate bounded 512 KiB compressed-data cache uses
+eight 64 KiB windows for colder blink variants, with 32 KiB alignment and a
+low-priority reader task. Stable center poses prefetch the complete blink
+sequence, moving poses prefetch the first blink level, and demand reads are
+placed ahead of queued speculative work. The first uncached blink frame waits
+up to 500 ms for its window; subsequent nearby frames use cached bytes. Leases
+protect pages while decoding. A read failure disables the SD source and returns
+rendering to built-in Copilot. USB replacement gates new OpenClaw renders and
+cooperatively stops the reader before closing or modifying its file.
 SD-only characters will require their own asset catalog and loading policy.
 
 A missing pack, mount failure, incompatible hash, or later read failure is
@@ -138,17 +153,16 @@ bash tools/test_sprite_cache.sh
 ```
 
 `SD state=pack_missing` means the card mounted but needs the matching file.
-`state=ready` means the pack was verified and its cache is enabled; `hits` counts
-blocks actually served from cached SD data, while `misses` counts flash fallbacks.
-Card-backed throughput still needs verification with a matching pack present;
-mount-only/flash-fallback measurements do not establish SD playback performance.
+`state=ready` means the pack was verified and its caches are enabled; `hits`
+counts blocks served from either PSRAM tier, while `misses` counts requests that
+had to schedule an SD window read.
 
-The inserted 64 GB card mounted successfully and reported **63,864,569,856 bytes**.
-Its current status is `pack_missing`; no card files were written. With the card
-mounted and flash fallback active, all six measured reports were **30.0 fps**,
-with a **33.345 ms** maximum presentation interval and stable memory
-(182,588 bytes internal heap, 7,596,744 bytes PSRAM). Heap integrity and all four
-reaction modes passed. These measurements do not yet exercise SD cache hits.
+The inserted 64 GB card reports **63,864,569,856 bytes**. With the matching
+OpenClaw pack installed, open-eye frames remain resident in PSRAM and repeated
+poses avoid decompression through a final decoded-frame cache. Live idle
+measurements reduced the original recurring 250-300 ms presentation stalls to
+about 52 ms after blink pages warmed. Cold blink pages measured approximately
+160-200 ms, with 4.28 MB PSRAM and 139 KB internal heap remaining.
 
 ## Preview and development
 

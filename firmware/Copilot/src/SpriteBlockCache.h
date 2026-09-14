@@ -5,9 +5,9 @@
 
 namespace copilot {
 
-constexpr size_t kSpriteCacheSlots = 4;
-constexpr size_t kSpriteCachePageBytes = 65536;
-constexpr size_t kSpriteCacheWindowBytes = 131072;
+constexpr size_t kSpriteCacheSlots = 8;
+constexpr size_t kSpriteCachePageBytes = 32768;
+constexpr size_t kSpriteCacheWindowBytes = 65536;
 
 // All metadata access requires the caller's lock. The caller owns the memory
 // and must keep it alive until all pins and outstanding worker writes finish.

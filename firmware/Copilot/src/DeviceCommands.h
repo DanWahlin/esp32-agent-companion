@@ -4,8 +4,11 @@
 #include <initializer_list>
 
 namespace copilot {
-enum class DeviceCommand { None, Invalid, Capture, Heap, Info, Idle, Surprise, Working, Complete, Attention };
-constexpr unsigned kDeviceProtocol = 1;
+enum class DeviceCommand {
+  None, Invalid, Capture, Heap, Info, UploadOpenClaw,
+  Idle, Surprise, Working, Complete, Attention
+};
+constexpr unsigned kDeviceProtocol = 2;
 
 inline const char* commandName(DeviceCommand command) {
   switch (command) {
@@ -32,6 +35,7 @@ class DeviceCommands {
       if (byte == 's') return DeviceCommand::Capture;
       if (byte == 'h') return DeviceCommand::Heap;
       if (byte == 'i') return DeviceCommand::Info;
+      if (byte == 'u') return DeviceCommand::UploadOpenClaw;
       return byte == '\r' || byte == '\n' ? DeviceCommand::None : DeviceCommand::Invalid;
     }
     previous_ = milliseconds;

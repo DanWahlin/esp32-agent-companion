@@ -18,6 +18,7 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
     assert.equal(await page.locator('#play').textContent(), 'Play');
     assert.equal(await page.locator('#connection').textContent(), 'Paused');
     assert.equal(await page.locator('[data-mode]').count(), 6);
+    assert.equal(await page.locator('input[name="character"]').count(), 2);
     assert.equal(await page.locator('#error').isVisible(), false);
     const fullArt = (await page.locator('#assets').textContent()).startsWith('All 13');
     const initial = await page.locator('#screen').evaluate(canvas => canvas.toDataURL());
@@ -45,6 +46,21 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
       }
     });
     assert.equal(parity, true, 'Canvas exactly decodes native RGB565 output');
+    const openClawResponse = page.waitForResponse(res => res.url().endsWith('/api/character/frame')
+      && res.request().postDataJSON().character === 'openclaw');
+    await page.locator('.character-picker label', {hasText: 'OpenClaw'}).click();
+    await openClawResponse;
+    const openClaw = await page.locator('#screen').evaluate(canvas => canvas.toDataURL());
+    assert.notEqual(openClaw, initial, 'OpenClaw selection changes the native sprite pixels');
+    assert.equal(await page.locator('#assets').textContent(),
+      'All 13 OpenClaw tracks are pre-rendered 3D sprites, including both attention tilts.');
+    assert.equal(await page.locator('#character').getAttribute('aria-label'), 'Surprise OpenClaw');
+    await page.screenshot({path: 'build/character-openclaw.png', fullPage: true});
+    const copilotResponse = page.waitForResponse(res => res.url().endsWith('/api/character/frame')
+      && res.request().postDataJSON().character === 'copilot');
+    await page.locator('.character-picker label', {hasText: 'Copilot'}).click();
+    await copilotResponse;
+    assert.equal(await page.locator('#screen').evaluate(canvas => canvas.toDataURL()), initial);
     for (let mode = 1; mode <= 5; mode++) {
       const response = page.waitForResponse(res => res.url().endsWith('/api/character/frame')
         && res.request().postDataJSON().mode === mode);
@@ -134,6 +150,10 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.screenshot({path: 'build/character-preview-mobile.png', fullPage: true});
     if (fullArt) {
+      await page.goto(`${base}/character-preview.html?character=openclaw&mode=working`);
+      await page.waitForFunction(() => !document.getElementById('play').disabled);
+      assert.equal(await page.locator('input[value="openclaw"]').isChecked(), true);
+      assert.equal(await page.locator('#pending').textContent(), 'Working');
       await page.goto(`${base}/sprite-preview.html`);
       for (const mode of ['surprise', 'working', 'complete', 'attention', 'sleep']) {
         assert.equal(await page.locator(`a[href="/character-preview.html?mode=${mode}"]`).count(), 1);
@@ -150,6 +170,27 @@ const base = process.env.CHARACTER_PREVIEW_URL || 'http://127.0.0.1:8765';
       const delta = (await slowFrame).postDataJSON().delta;
       assert.ok(delta <= 1 / 120, 'quarter speed scales the native animation clock');
       await page.locator('#play').click();
+      await page.goto(`${base}/character-preview.html`);
+      await page.waitForFunction(() => !document.getElementById('play').disabled);
+      assert.equal(await page.locator('#wave').isEnabled(), true);
+      const beforeWave = await page.locator('#screen').evaluate(canvas => canvas.toDataURL());
+      const waveRequest = page.waitForRequest(request => request.url().endsWith('/api/character/frame')
+        && request.postDataJSON().direction === 0);
+      await page.locator('#wave').click();
+      const wavePayload = (await waveRequest).postDataJSON();
+      assert.equal(wavePayload.character, 'openclaw');
+      assert.equal(await page.locator('input[value="openclaw"]').isChecked(), true);
+      assert.equal(new URL(page.url()).searchParams.get('character'), 'openclaw');
+      await page.waitForFunction(() => {
+        const [direction, index] = document.getElementById('pose').textContent.split(' / ')[0].split(':').map(Number);
+        return direction === 0 && index >= 8;
+      });
+      assert.notEqual(await page.locator('#screen').evaluate(canvas => canvas.toDataURL()), beforeWave,
+        'Preview wave visibly changes the native framebuffer');
+      await page.reload();
+      await page.waitForFunction(() => !document.getElementById('play').disabled);
+      assert.equal(await page.locator('input[value="openclaw"]').isChecked(), true,
+        'Character Lab preserves the selected character across reloads');
     }
     assert.deepEqual(errors, []);
     console.log(`Native character browser controls, RGB565 parity, pause and mobile layout passed (${fullArt ? 13 : 8} tracks)`);

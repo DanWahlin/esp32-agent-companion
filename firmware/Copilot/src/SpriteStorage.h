@@ -22,6 +22,11 @@ struct SdSpriteStatus {
 // Optional, read-only boot initialization. Errors leave the verified flash source active.
 void initializeSdSpriteStorage();
 SdSpriteStatus sdSpriteStatus();
+bool openClawAvailable();
+bool prepareOpenClawUpdate();
 SpriteBlockLease acquireSpriteBlock(size_t offset, size_t bytes);
 void releaseSpriteBlock(const SpriteBlockLease& block);
+SpriteBlockLease acquireOpenClawBlock(size_t offset, size_t bytes);
+void prefetchOpenClawBlock(size_t offset, size_t bytes);
+void releaseOpenClawBlock(const SpriteBlockLease& block);
 }

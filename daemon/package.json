@@ -11,6 +11,7 @@
     "test": "npm run build && node --test dist/test/*.test.js",
     "start": "node dist/src/cli.js daemon",
     "status": "node dist/src/cli.js status",
+    "install:openclaw": "npm run build && node dist/src/cli.js install-character openclaw ../assets/openclaw-lab.bin",
     "install:daemon": "npm run build && node dist/src/install.js",
     "install:macos": "npm run install:daemon"
   },

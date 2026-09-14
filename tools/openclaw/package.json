@@ -1,0 +1,12 @@
+{
+  "name": "openclaw-sprite-forge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node export-sprites.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.57.0",
+    "three": "0.180.0"
+  }
+}

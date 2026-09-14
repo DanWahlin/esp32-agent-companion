@@ -1,18 +1,45 @@
 'use strict';
 (() => {
   const names = ['Idle', 'Surprise', 'Working', 'Complete', 'Needs attention', 'Sleeping'];
+  const characterStorageKey = 'agent-companion.character-lab.character';
+  const characterCookie = 'agent_companion_character';
   const session = crypto.randomUUID();
   const canvas = document.getElementById('screen');
   const context = canvas.getContext('2d', {alpha: false});
   const image = context.createImageData(412, 466);
   const play = document.getElementById('play');
+  const wave = document.getElementById('wave');
   const errorBox = document.getElementById('error');
   let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let pending = null, inFlight = false, ready = false, stopped = false, dirty = true;
+  let pending = null, pendingDirection = null;
+  let inFlight = false, ready = false, stopped = false, dirty = true;
   let errorRequiresAction = false;
   let speed = 1;
+  let character = 'copilot';
   let last = performance.now(), due = 0;
 
+  function savedCharacter() {
+    try {
+      const value = localStorage.getItem(characterStorageKey);
+      if (value === 'copilot' || value === 'openclaw') return value;
+    } catch {
+      // Fall through to the cookie when browser storage is unavailable.
+    }
+    const cookie = document.cookie.split('; ').find(value =>
+      value.startsWith(`${characterCookie}=`))?.split('=')[1];
+    return cookie === 'copilot' || cookie === 'openclaw' ? cookie : null;
+  }
+  function saveCharacter(value) {
+    try {
+      localStorage.setItem(characterStorageKey, value);
+    } catch {
+      // Storage can be unavailable in private or policy-restricted contexts.
+    }
+    document.cookie = `${characterCookie}=${value}; Max-Age=31536000; Path=/; SameSite=Lax`;
+    const url = new URL(location.href);
+    url.searchParams.set('character', value);
+    history.replaceState(null, '', url);
+  }
   function showError(message) { errorBox.textContent = message; errorBox.hidden = false; }
   function signal(mode) {
     pending = mode;  // Latest explicit signal wins, with no unbounded command queue.
@@ -28,6 +55,35 @@
     button.addEventListener('click', () => signal(Number(button.dataset.mode)));
   });
   document.getElementById('character').addEventListener('click', () => signal(1));
+  wave.addEventListener('click', () => {
+    if (character !== 'openclaw') {
+      character = 'openclaw';
+      saveCharacter(character);
+      document.querySelector('input[name="character"][value="openclaw"]').checked = true;
+      document.getElementById('character').setAttribute('aria-label', 'Surprise OpenClaw');
+    }
+    pending = 0;
+    pendingDirection = 0;
+    playing = true;
+    updatePlay();
+    last = performance.now();
+    dirty = true;
+    due = performance.now();
+    document.getElementById('status').textContent =
+      'Wave requested — returning through center first if needed.';
+  });
+  document.querySelectorAll('input[name="character"]').forEach(input => {
+    input.addEventListener('change', event => {
+      character = event.target.value;
+      saveCharacter(character);
+      dirty = true;
+      due = performance.now();
+      document.getElementById('character').setAttribute(
+        'aria-label', `Surprise ${character === 'openclaw' ? 'OpenClaw' : 'Copilot'}`);
+      document.getElementById('status').textContent =
+        `${character === 'openclaw' ? 'OpenClaw' : 'Copilot'} selected. Motion state preserved.`;
+    });
+  });
   document.addEventListener('keydown', event => {
     if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.target.closest('input,select,textarea,[contenteditable="true"]')) return;
@@ -41,14 +97,17 @@
   async function frame(now) {
     if (inFlight || stopped) return;
     const mode = pending;
+    const direction = pendingDirection;
     pending = null;
+    pendingDirection = null;
     dirty = false;
     inFlight = true;
     const delta = ready && playing ? Math.min((now - last) / 1000, 1 / 30) * speed : 0;
     last = now;
     try {
-      const payload = {session, delta, playing};
+      const payload = {session, delta, playing, character};
       if (mode !== null) payload.mode = mode;
+      if (direction !== null) payload.direction = direction;
       const response = await fetch('/api/character/frame', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(payload), signal: AbortSignal.timeout(6000),
@@ -79,8 +138,10 @@
       document.getElementById('pose').textContent = `${value('direction')}:${value('index')} / ${value('blink')}`;
       document.getElementById('timing').textContent = `${Number(value('renderMs')).toFixed(2)} ms`;
       document.getElementById('connection').textContent = playing ? 'Live · 30 Hz target' : 'Paused';
-      document.getElementById('assets').textContent = Number(value('availableDirections')) >= 13
-        ? 'All 13 native tracks available, including both attention tilts. Original artwork is retained.'
+      document.getElementById('assets').textContent = character === 'openclaw'
+        ? 'All 13 OpenClaw tracks are pre-rendered 3D sprites, including both attention tilts.'
+        : Number(value('availableDirections')) >= 13
+        ? 'All 13 native Copilot tracks are available, including both attention tilts. Original artwork is retained.'
         : 'Expression artwork is incomplete. Re-export all 13 tracks before requesting expression modes.';
       document.querySelectorAll('[data-mode]').forEach(button =>
         button.setAttribute('aria-pressed', String(Number(button.dataset.mode) === requested)));
@@ -131,6 +192,14 @@
     dirty = true;
   });
   const initialMode = new URLSearchParams(location.search).get('mode');
+  const initialCharacter = new URLSearchParams(location.search).get('character');
+  const preferredCharacter = initialCharacter ?? savedCharacter();
+  if (preferredCharacter !== null) {
+    const input = document.querySelector(
+      `input[name="character"][value="${CSS.escape(preferredCharacter)}"]`);
+    if (!input) { showError('Unknown character in this link.'); errorRequiresAction = true; }
+    else { input.checked = true; input.dispatchEvent(new Event('change')); }
+  }
   if (initialMode !== null) {
     const index = ['idle', 'surprise', 'working', 'complete', 'attention', 'sleep'].indexOf(initialMode);
     if (index < 0) { showError('Unknown character mode in this link.'); errorRequiresAction = true; }

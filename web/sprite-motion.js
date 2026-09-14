@@ -62,6 +62,7 @@
     request(direction) {
       if (!DIRECTIONS.includes(direction)) throw new Error(`Unknown sprite direction: ${direction}`);
       this.queue.push(direction);
+      if (this.phase === 'center' && this.index === 0) this.hold = 0;
     }
     inspect(index) {
       this.setPlaying(false);
@@ -134,7 +135,8 @@
       const travelled = this.phase === 'out' ? this.index : this.target - this.index;
       const before = travelled / this.target, after = (travelled + 1) / this.target;
       const turnDuration = this.duration * Math.sqrt(this.target / (this.count - 1));
-      return turnDuration * (this.eased ? inverseQuintic(after) - inverseQuintic(before) : after - before);
+      const eased = this.eased && this.direction !== 'right';
+      return turnDuration * (eased ? inverseQuintic(after) - inverseQuintic(before) : after - before);
     }
     sample(crossfade = false) {
       if (!crossfade || this.inspecting || (this.phase !== 'out' && this.phase !== 'return')) {
@@ -167,7 +169,7 @@
       this.index += this.phase === 'out' ? 1 : -1;
       if (this.index === this.target && this.phase === 'out') {
         this.phase = 'endpoint';
-        this.hold = this.cycling ? .6 : this.range(.35, 1.4);
+        this.hold = this.direction === 'right' ? .001 : this.cycling ? .6 : this.range(.35, 1.4);
       } else if (this.index === 0 && this.phase === 'return') {
         this.phase = 'center';
         this.hold = this.cycling ? .6 : this.range(.35, 1.6);

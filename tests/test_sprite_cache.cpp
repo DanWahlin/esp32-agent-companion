@@ -36,9 +36,10 @@ void operator delete(void* memory, size_t, std::align_val_t) noexcept { std::fre
 void operator delete[](void* memory, size_t, std::align_val_t) noexcept { std::free(memory); }
 
 using copilot::SpriteBlockCache;
+constexpr size_t slots = copilot::kSpriteCacheSlots;
 constexpr size_t page = copilot::kSpriteCachePageBytes;
 constexpr size_t window = copilot::kSpriteCacheWindowBytes;
-constexpr size_t capacity = copilot::kSpriteCacheSlots * window;
+constexpr size_t capacity = slots * window;
 constexpr size_t guard = 37;
 constexpr uint8_t sentinel = 0xa5;
 
@@ -52,7 +53,7 @@ struct Fixture {
   std::vector<uint8_t> flash;
   SpriteBlockCache cache;
 
-  explicit Fixture(size_t fileSize = 20 * page + 193)
+  explicit Fixture(size_t fileSize = (slots * 4 + 1) * page + 193)
       : storage(capacity + 2 * guard, sentinel),
         flash(fileSize),
         cache(storage.data() + guard, capacity, fileSize) {
@@ -128,30 +129,31 @@ static void boundariesAndOverlap() {
 static void outstandingJobs() {
   Fixture f;
   NoAllocations noAllocations;
-  SpriteBlockCache::Lookup loads[4];
-  SpriteBlockCache::Job jobs[4];
-  for (int i = 0; i < 4; ++i) {
+  SpriteBlockCache::Lookup loads[slots];
+  SpriteBlockCache::Job jobs[slots];
+  for (size_t i = 0; i < slots; ++i) {
     loads[i] = f.cache.acquire(static_cast<size_t>(i) * 3 * page, page);
-    assert(loads[i].load && loads[i].slot == i);
-    jobs[i] = f.cache.job(i);
+    assert(loads[i].load && loads[i].slot == static_cast<int>(i));
+    jobs[i] = f.cache.job(static_cast<int>(i));
     fallback(f.cache.acquire(static_cast<size_t>(i) * 3 * page + page - 1, 2));
   }
-  fallback(f.cache.acquire(15 * page, 1));
+  fallback(f.cache.acquire(slots * 3 * page, 1));
   // A release token never changes a loading slot or permits its reuse.
-  for (int i = 0; i < 4; ++i) f.cache.release(i);
-  fallback(f.cache.acquire(15 * page, 1));
-  for (int i = 3; i >= 0; --i) {
-    assert(f.cache.job(i).data == jobs[i].data);
+  for (size_t i = 0; i < slots; ++i) f.cache.release(static_cast<int>(i));
+  fallback(f.cache.acquire(slots * 3 * page, 1));
+  for (size_t remaining = slots; remaining > 0; --remaining) {
+    const size_t i = remaining - 1;
+    assert(f.cache.job(static_cast<int>(i)).data == jobs[i].data);
     f.fill(i);  // Worker writes without touching metadata.
     fallback(f.cache.acquire(jobs[i].offset, 1));  // Not yet published.
-    f.cache.complete(i, true);
+    f.cache.complete(static_cast<int>(i), true);
     const auto hit = f.hit(jobs[i].offset, page);
-    assert(hit.slot == i);
+    assert(hit.slot == static_cast<int>(i));
     // Keep each completed slot pinned while the other jobs remain outstanding.
   }
-  fallback(f.cache.acquire(15 * page, 1));
-  for (int i = 0; i < 4; ++i) f.cache.release(i);
-  assert(f.cache.acquire(15 * page, 1).load);
+  fallback(f.cache.acquire(slots * 3 * page, 1));
+  for (size_t i = 0; i < slots; ++i) f.cache.release(static_cast<int>(i));
+  assert(f.cache.acquire(slots * 3 * page, 1).load);
 }
 
 static void readyBeforeOverlappingLoad() {
@@ -171,31 +173,36 @@ static void readyBeforeOverlappingLoad() {
 static void lruAndPins() {
   Fixture f;
   NoAllocations noAllocations;
-  int slots[4];
-  for (int i = 0; i < 4; ++i) slots[i] = f.load(static_cast<size_t>(i) * 3 * page);
+  int loadedSlots[slots];
+  for (size_t i = 0; i < slots; ++i)
+    loadedSlots[i] = f.load(static_cast<size_t>(i) * 3 * page);
   auto refreshed = f.hit(0, 10);
   f.cache.release(refreshed.slot);
-  auto oldest = f.cache.acquire(12 * page, 1);
-  assert(oldest.load && oldest.slot == slots[1]);
+  auto oldest = f.cache.acquire(slots * 3 * page, 1);
+  assert(oldest.load && oldest.slot == loadedSlots[1]);
   f.fill(oldest.slot);
   f.cache.complete(oldest.slot, true);
 
   auto pin1 = f.hit(6 * page, 20);
   auto pin2 = f.hit(6 * page, 20);
-  for (size_t offset : {9 * page, size_t(0), 12 * page}) {
+  for (size_t i = 3; i < slots; ++i) {
+    auto hit = f.hit(i * 3 * page, 1);
+    f.cache.release(hit.slot);
+  }
+  for (size_t offset : {slots * 3 * page, size_t(0)}) {
     auto hit = f.hit(offset, 1);
     f.cache.release(hit.slot);
   }
   // The oldest slot is pinned twice and must be skipped, even after one release.
   f.cache.release(pin1.slot);
-  auto replacement = f.cache.acquire(15 * page, 1);
-  assert(replacement.load && replacement.slot == slots[3]);
+  auto replacement = f.cache.acquire((slots * 3 + 3) * page, 1);
+  assert(replacement.load && replacement.slot == loadedSlots[3]);
   assert(std::memcmp(pin2.data, f.flash.data() + 6 * page, 20) == 0);
   f.fill(replacement.slot);
   f.cache.complete(replacement.slot, true);
   f.cache.release(pin2.slot);
-  auto unpinned = f.cache.acquire(18 * page, 1);
-  assert(unpinned.load && unpinned.slot == slots[2]);
+  auto unpinned = f.cache.acquire((slots * 3 + 6) * page, 1);
+  assert(unpinned.load && unpinned.slot == loadedSlots[2]);
 }
 
 static void failureAndBounds() {
@@ -207,7 +214,7 @@ static void failureAndBounds() {
                        f.cache.acquire(std::numeric_limits<size_t>::max(), 1),
                        f.cache.acquire(1, std::numeric_limits<size_t>::max())})
     fallback(request);
-  for (int i = 0; i < 4; ++i) noJob(f.cache.job(i));
+  for (size_t i = 0; i < slots; ++i) noJob(f.cache.job(static_cast<int>(i)));
   auto failed = f.cache.acquire(0, 1);
   assert(failed.load);
   f.fill(failed.slot);
@@ -240,7 +247,7 @@ static void failureAndBounds() {
   f.cache.complete(straddle.slot, true);
   tail = f.hit(3 * page - 8, 31);
   f.cache.release(tail.slot);
-  for (int invalid : {-1, 4, std::numeric_limits<int>::max()}) {
+  for (int invalid : {-1, static_cast<int>(slots), std::numeric_limits<int>::max()}) {
     noJob(f.cache.job(invalid));
     f.cache.complete(invalid, true);
     f.cache.release(invalid);
@@ -272,7 +279,7 @@ static void disableAndUnavailable() {
   f.cache.release(pin.slot);
   f.cache.release(pin.slot);
   assert(std::memcmp(pin.data, f.flash.data(), page) == 0);
-  for (int i = 0; i < 4; ++i) noJob(f.cache.job(i));
+  for (size_t i = 0; i < slots; ++i) noJob(f.cache.job(static_cast<int>(i)));
 
   SpriteBlockCache unavailable(nullptr, capacity, page);
   SpriteBlockCache undersized(f.storage.data() + guard, capacity - 1, page);
@@ -318,7 +325,7 @@ static void randomizedInterleaving() {
     size_t size = 0;
   };
   Held held[12];
-  SpriteBlockCache::Job pending[4]{};
+  SpriteBlockCache::Job pending[slots]{};
   uint32_t seed = 0x329841;
   auto random = [&seed]() {
     seed ^= seed << 13;
@@ -327,7 +334,7 @@ static void randomizedInterleaving() {
     return seed;
   };
   for (size_t iteration = 0; iteration < 5000; ++iteration) {
-    const size_t selected = random() % 4;
+    const size_t selected = random() % slots;
     if (pending[selected].data && random() % 3 == 0) {
       const auto job = pending[selected];
       // Finish the delayed second half before completion, including failures.
@@ -350,7 +357,8 @@ static void randomizedInterleaving() {
       assert(!pending[lookup.slot].data);
       target = {lookup, offset, size};
     } else if (lookup.load) {
-      assert(lookup.slot >= 0 && lookup.slot < 4 && !pending[lookup.slot].data);
+      assert(lookup.slot >= 0 && lookup.slot < static_cast<int>(slots)
+             && !pending[lookup.slot].data);
       for (const Held& pin : held)
         assert(!pin.lookup.data || pin.lookup.slot != lookup.slot);
       auto job = f.cache.job(lookup.slot);
