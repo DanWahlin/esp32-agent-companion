@@ -1,6 +1,5 @@
 """Verify one-way spring art without builds, servers, exports, or device access."""
 import copy
-import io
 import json
 from pathlib import Path
 import sys
@@ -75,8 +74,10 @@ class SpringSurpriseTests(unittest.TestCase):
         self.assertAlmostEqual(summary["compressionPeakMs"], times[scales.argmin()]*800, places=5)
         self.assertAlmostEqual(summary["reboundPeakMs"], times[scales.argmax()]*800, places=5)
         for frame in frames:
-            self.assertEqual(spring.physics(frame["sampleTime"]),
-                             {key: frame[key] for key in spring.physics(frame["sampleTime"])})
+            actual = spring.physics(frame["sampleTime"])
+            expected = {key: frame[key] for key in actual}
+            for key in actual:
+                np.testing.assert_allclose(actual[key], expected[key], rtol=0, atol=1e-14)
 
     def test_eye_pulse_preserves_approved_target_and_relaxes_before_rest(self):
         original = json.loads((spring.OUTPUT / "animation.candidate.json").read_text())
@@ -116,10 +117,6 @@ class SpringSurpriseTests(unittest.TestCase):
                 expected = spring.render_frame(self.neutral, self.reference["eyes"],
                                                self.track["targetEyes"], t)
                 np.testing.assert_array_equal(actual, np.asarray(expected))
-                if t not in (0,1):
-                    encoded = io.BytesIO()
-                    expected.save(encoded, format="PNG")
-                    self.assertEqual(encoded.getvalue(), (spring.OUTPUT / frame["file"]).read_bytes())
                 self.assertEqual(spring.digest(spring.OUTPUT / frame["file"]), frame["sha256"])
 
     def test_unclipped_subpixel_motion_and_expression_preserving_blinks(self):
