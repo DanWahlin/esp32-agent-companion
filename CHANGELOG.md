@@ -2,6 +2,12 @@
 
 Notable changes to this ESP32 companion.
 
+## [v0.3.1]
+
+### Fixes
+
+- Fix portable release validation
+
 ## [v0.3.0]
 
 ### Features and improvements
