@@ -16,7 +16,8 @@ built-in character.
 
 ## What it does
 
-- **Natural motion:** smooth 30 FPS playback, eight looking directions, and occasional blinks.
+- **Natural motion:** smooth display presentation, eight looking directions, and occasional
+  blinks. OpenClaw uses a character-specific 12 FPS walking cycle for responsive motion.
 - **Touch reactions:** tap the character for a quick spring-like recoil and widened eyes,
   then return to Idle.
 - **On-device settings:** swipe up to adjust brightness, sound, character, or state.
@@ -27,9 +28,10 @@ built-in character.
 - **Automatic sleep:** after two Idle minutes, the character sleeps for one minute
   with subtle movement, drowsy eyelids, and drifting Zs.
 - **Compact graphics:** lossless sprite compression preserves the artwork while keeping
-  the current sprite pack around 9.53 MB.
-- **Optional OpenClaw character:** a validated, read-only microSD sprite pack can be
-  selected from Settings, with built-in Copilot assets as the automatic fallback.
+  the built-in Copilot sprite pack around 9.53 MB.
+- **Optional OpenClaw character:** a validated microSD sprite pack, read-only during
+  normal operation, can be selected from Settings, with built-in Copilot assets as
+  the automatic fallback.
 
 The character works immediately in automatic Idle mode. Agent states can be
 controlled through USB serial commands, the swipe-up settings menu, or the
@@ -187,13 +189,17 @@ download-mode problems, see the [Waveshare instructions](https://www.waveshare.c
 ### Optional: add OpenClaw on microSD
 
 The built-in Copilot character works without a card. OpenClaw uses microSD so
-both full-resolution packs do not compete for internal flash.
+both full-resolution packs do not compete for internal flash. Its sprite pack is
+approximately 10 MB. Use firmware and repository files from the same release,
+**v0.3.1 or newer**. The firmware provides the required upload protocol and accepts
+only its exactly matching OpenClaw pack.
 
 1. Insert a **FAT32** microSD card. A 64 GB FAT32 card has been tested.
 2. Connect the device to the Mac or Linux computer over USB.
-3. From the repository root, run:
+3. From the repository root, install the daemon dependencies and upload the pack:
 
    ```bash
+   npm ci --prefix daemon
    npm --prefix daemon run install:openclaw
    ```
 
@@ -204,7 +210,9 @@ both full-resolution packs do not compete for internal flash.
    The Node installer pauses the local daemon, streams the pack to a temporary
    SD file, verifies it on the device, atomically installs it, reboots, and
    restarts the daemon.
-4. Swipe up on the display and choose **OpenClaw** under **Character**.
+4. Swipe up on the display and choose **OpenClaw** under **Character**. The selected
+   character is saved and restored across device restarts while its pack remains
+   available.
 
 The firmware never formats the card or writes during normal operation, and the
 device does not expose it as a USB drive. It writes only during an explicit Node installation. The
@@ -241,7 +249,9 @@ python3 tools/serve_preview.py
 
 Then open [http://127.0.0.1:8765/character-preview.html](http://127.0.0.1:8765/character-preview.html).
 Each browser tab runs an isolated native renderer, with controls for character
-selection, pausing, playback speed, touch reactions, and each character state.
+selection, pausing, playback speed, touch reactions, each character state, and an
+explicit OpenClaw wave preview. Character Lab remembers the selected character
+across page reloads.
 
 To regenerate the OpenClaw sprites after changing its 3D source model:
 
