@@ -2,6 +2,14 @@
 
 Notable changes to this ESP32 companion.
 
+## [v0.3.0]
+
+### Features and improvements
+
+- Add sleeping state and portable daemon
+
+- Add OpenClaw character support
+
 ## [v0.2.0]
 
 ### Build and maintenance
