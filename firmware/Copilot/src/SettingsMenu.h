@@ -8,6 +8,7 @@ enum class SettingsAction : uint8_t {
   BrightnessUp,
   SoundDown,
   SoundUp,
+  ToggleTilt,
   CharacterCopilot,
   CharacterOpenClaw,
   Idle,
@@ -20,17 +21,20 @@ enum class SettingsAction : uint8_t {
 
 class SettingsMenu {
  public:
-  explicit SettingsMenu(uint8_t brightness, uint8_t soundVolume = 50)
-      : brightness_(brightness), soundVolume_(soundVolume) {}
+  explicit SettingsMenu(uint8_t brightness, uint8_t soundVolume = 50,
+                        bool tiltEnabled = false)
+      : brightness_(brightness), soundVolume_(soundVolume), tiltEnabled_(tiltEnabled) {}
 
   bool isOpen() const { return open_; }
   void open() { open_ = true; }
   void close() { open_ = false; }
   uint8_t brightness() const { return brightness_; }
   uint8_t soundVolume() const { return soundVolume_; }
+  bool tiltEnabled() const { return tiltEnabled_; }
   void setSoundVolume(uint8_t soundVolume) {
     soundVolume_ = soundVolume > 100 ? 100 : soundVolume;
   }
+  void setTiltEnabled(bool enabled) { tiltEnabled_ = enabled; }
 
   SettingsAction tap(int16_t x, int16_t y) {
     if (!open_) return SettingsAction::None;
@@ -50,14 +54,18 @@ class SettingsMenu {
       soundVolume_ = soundVolume_ < 75 ? soundVolume_ + 25 : 100;
       return SettingsAction::SoundUp;
     }
-    if (inside(x, y, 58, 244, 165, 34)) return SettingsAction::CharacterCopilot;
-    if (inside(x, y, 243, 244, 165, 34)) return SettingsAction::CharacterOpenClaw;
-    if (inside(x, y, 58, 306, 165, 34)) return SettingsAction::Idle;
-    if (inside(x, y, 243, 306, 165, 34)) return SettingsAction::Working;
-    if (inside(x, y, 58, 344, 165, 34)) return SettingsAction::Complete;
-    if (inside(x, y, 243, 344, 165, 34)) return SettingsAction::Attention;
-    if (inside(x, y, 58, 382, 165, 34)) return SettingsAction::Surprise;
-    if (inside(x, y, 243, 382, 165, 34)) return SettingsAction::Close;
+    if (inside(x, y, 58, 232, 165, 32)) return SettingsAction::CharacterCopilot;
+    if (inside(x, y, 243, 232, 165, 32)) return SettingsAction::CharacterOpenClaw;
+    if (inside(x, y, 268, 270, 140, 30)) {
+      tiltEnabled_ = !tiltEnabled_;
+      return SettingsAction::ToggleTilt;
+    }
+    if (inside(x, y, 58, 324, 165, 28)) return SettingsAction::Idle;
+    if (inside(x, y, 243, 324, 165, 28)) return SettingsAction::Working;
+    if (inside(x, y, 58, 354, 165, 28)) return SettingsAction::Complete;
+    if (inside(x, y, 243, 354, 165, 28)) return SettingsAction::Attention;
+    if (inside(x, y, 58, 384, 165, 28)) return SettingsAction::Surprise;
+    if (inside(x, y, 243, 384, 165, 28)) return SettingsAction::Close;
     return SettingsAction::None;
   }
 
@@ -68,6 +76,7 @@ class SettingsMenu {
 
   uint8_t brightness_;
   uint8_t soundVolume_;
+  bool tiltEnabled_;
   bool open_ = false;
 };
 }

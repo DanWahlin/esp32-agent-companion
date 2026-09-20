@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import {runDaemon} from './daemon.js';
 import {requestDaemon} from './client.js';
-import {characterStates, hookEvents, type HookEvent, type HookPayload} from './protocol.js';
+import {
+  characterStates, hookEvents, tiltTestPrompts, type HookEvent, type HookPayload,
+} from './protocol.js';
 import {installOpenClaw} from './character-installer.js';
 
 async function main(): Promise<void> {
@@ -16,6 +18,13 @@ async function main(): Promise<void> {
   }
   if (command === 'send' && characterStates.includes(argument as never)) {
     console.log(JSON.stringify(await requestDaemon({type: 'send', state: argument as typeof characterStates[number]})));
+    return;
+  }
+  if (command === 'tilt-test' && tiltTestPrompts.includes(argument as never)) {
+    console.log(JSON.stringify(await requestDaemon({
+      type: 'tiltTest',
+      prompt: argument as typeof tiltTestPrompts[number],
+    }, 5000), null, 2));
     return;
   }
   if (command === 'hook' && hookEvents.includes(argument as never)) {
@@ -36,7 +45,7 @@ async function main(): Promise<void> {
     return;
   }
   throw new Error(
-    'Usage: agent-companion {daemon|status|send STATE|hook EVENT|install-character openclaw FILE [--port PATH]}');
+    'Usage: agent-companion {daemon|status|send STATE|tilt-test PROMPT|hook EVENT|install-character openclaw FILE [--port PATH]}');
 }
 
 async function readStdin(): Promise<string> {

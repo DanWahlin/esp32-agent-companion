@@ -206,6 +206,74 @@ name are correlated with stops that later add a unique agent ID; stop events are
 resolved against their parent lease, and legacy name-only leases are discarded
 on restart so completed task agents cannot leave the display stuck in Working.
 
+### GitHub Copilot app plugin
+
+`plugins/copilot-app-companion/` is an Agent Plugins 1.0 package. Its
+dependency-free stdio MCP server resolves the same private daemon socket as the
+CLI client and sends lease requests rather than accessing `serialport`.
+Persistent app states therefore participate in the existing priority order and
+lease expiry behavior. Connection tests and explicit state calls wait for a
+firmware acknowledgement; a missing daemon or disconnected device returns an
+error instead of success-shaped output.
+
+The current public hooks reference documents hook execution for Copilot CLI and
+Copilot cloud agent, not the GitHub Copilot app. The plugin intentionally does
+not duplicate the existing CLI hooks or claim deterministic app-wide lifecycle
+events. In the app, a focused skill guides MCP state calls and abandoned state
+recovers through the daemon watchdog.
+
+Validate the daemon and plugin together:
+
+```bash
+npm --prefix daemon test
+npm --prefix plugins/copilot-app-companion test
+copilot --plugin-dir ./plugins/copilot-app-companion plugin list --json
+```
+
+### Accelerometer-guided Idle motion
+
+The built-in QMI8658 shares the touch controller's I2C bus on SDA 15 and SCL 14.
+Firmware configures its accelerometer for +/-4 g at 1000 Hz with the hardware
+low-pass filter enabled, then samples it at the 30 FPS presentation cadence.
+
+Tilt gaze is a persistent, default-off Settings option. Enabling it does not
+calibrate over the settings panel: closing Settings first displays
+`PUT ME DOWN / KEEP STILL`, then averages 180 samples from the device's
+resting-on-a-surface orientation. If the saved option is already enabled, startup performs
+the same calibration because the prior runtime bias cannot be reused. Disabling
+the option clears guidance immediately and skips future startup calibration.
+
+`TiltLook` subtracts the measured baseline, maps the board axes to display axes
+for counter-rotation (`screen x = sensor y`, `screen y = -sensor x`), and applies
+a time-based exponential filter. Radial enter/exit thresholds provide
+hysteresis, and a three-sample direction latch prevents rapid switching near an
+octant boundary.
+
+While the character is Idle, the filtered vector selects the opposite one of
+the existing eight look tracks and maps its depth directly to a pose every
+frame, so the face counter-rotates without inheriting the autonomous 1.8-second
+turn timing. Tilting the device down makes Copilot look up, and vice versa.
+Returning the device to its calibrated pose releases guidance and resumes
+autonomous looking. Agent-controlled modes always take priority, and a deliberate
+tilt wakes the automatic Sleep cycle. IMU initialization failure is nonfatal and
+leaves the prior animation behavior intact.
+
+The daemon exposes a finite tilt-test protocol for user-observed hardware checks:
+
+```bash
+node daemon/dist/src/cli.js tilt-test center
+node daemon/dist/src/cli.js tilt-test away
+node daemon/dist/src/cli.js status
+```
+
+Each prompt displays full-screen instructions on the AMOLED for three seconds
+before revealing the live face. While active, firmware emits
+`TILT_TEST_SAMPLE` records every 500 ms with the requested prompt, filtered
+vector, mapped direction/depth, and rendered pose. The daemon retains the latest
+sample in its status response. Supported prompts are `center`, `away`, `toward`,
+`left`, `right`, `done`, and `cancel`; the protocol cannot send arbitrary serial
+data.
+
 ### Character Lab
 
 Run `python3 tools/serve_preview.py`, then open **http://127.0.0.1:8765**.

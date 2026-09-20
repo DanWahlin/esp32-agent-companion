@@ -14,7 +14,11 @@ static DeviceCommand send(DeviceCommands& parser, const std::string& text) {
 int main() {
   DeviceCommands parser;
   for (DeviceCommand command : {DeviceCommand::Idle, DeviceCommand::Surprise, DeviceCommand::Working,
-                                DeviceCommand::Complete, DeviceCommand::Attention}) {
+                                DeviceCommand::Complete, DeviceCommand::Attention,
+                                DeviceCommand::TestCenter, DeviceCommand::TestAway,
+                                DeviceCommand::TestToward, DeviceCommand::TestLeft,
+                                DeviceCommand::TestRight, DeviceCommand::TestDone,
+                                DeviceCommand::TestCancel}) {
     assert(send(parser, std::string("!") + commandName(command) + "\r\n") == command);
   }
   assert(send(parser, "s") == DeviceCommand::Capture);
@@ -30,5 +34,5 @@ int main() {
   assert(parser.expire(999) == DeviceCommand::None);
   assert(parser.expire(1000) == DeviceCommand::Invalid);
   assert(send(parser, "!attention\n") == DeviceCommand::Attention);
-  std::cout << "PASS: bounded mode packets, legacy diagnostics, CRLF, overflow and timeout recovery\n";
+  std::cout << "PASS: bounded mode/test packets, legacy diagnostics, CRLF, overflow and timeout recovery\n";
 }

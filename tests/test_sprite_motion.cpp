@@ -145,6 +145,7 @@ static void queueCycleAndControls() {
     assert(p.pose().index == 0);
     until(p, [](const auto& q) { return q.phase() == Phase::Center; });
   }
+
   assert(p.queued() == 0);
   p.setCycle(true);
   for (int i = 0; i < 24; ++i) {
@@ -181,6 +182,32 @@ static void queueCycleAndControls() {
     invalid.update(100);
     assert(invalid.pose().index == 0);
   }
+}
+
+static void guidedMotionHoldsAndChangesDirection() {
+  auto p = manual();
+  assert(p.guide(6, .5));
+  assert(p.phase() == Phase::Endpoint);
+  assert(p.pose().direction == 6);
+  assert(p.pose().index == 12);
+  assert(p.guide(6, 1));
+  assert(p.pose().direction == 6 && p.pose().index == 23);
+  assert(p.guide(6, .25));
+  assert(p.pose().direction == 6 && p.pose().index == 6);
+  for (int i = 0; i < 300; ++i) {
+    assert(p.guide(6, .5));
+    step(p, 1.0 / 30);
+  }
+  assert(p.phase() == Phase::Endpoint && p.pose().index == 12);
+
+  assert(p.guide(5, .75));
+  assert(p.phase() == Phase::Endpoint);
+  assert(p.pose().direction == 5);
+  assert(p.pose().index == 17);
+
+  p.clearGuide();
+  until(p, [](const auto& q) { return q.phase() == Phase::Center; });
+  assert(!p.guided() && p.automatic() && p.pose().index == 0);
 }
 
 static std::array<double, 11> state(const SpriteMotion& p) {
@@ -412,6 +439,7 @@ int main(int argc, char** argv) {
   }
   tracksAndTiming();
   queueCycleAndControls();
+  guidedMotionHoldsAndChangesDirection();
   edgeCacheInputs();
   stallsAndPause();
   blinking();
