@@ -28,6 +28,10 @@ case "$ACTION" in
       echo "Waveshare's CST9217 SensorLib is missing. See README.md." >&2
       exit 1
     fi
+    if [[ ! -f "$SENSORS/src/SensorQMI8658.hpp" ]]; then
+      echo "Waveshare's QMI8658 SensorLib is missing. See README.md." >&2
+      exit 1
+    fi
     "$CLI" --config-file "$CONFIG" core list --format json |
       python3 -c 'import json,sys; d=json.load(sys.stdin); platforms=d.get("platforms",d) if isinstance(d,dict) else d; assert any(p["id"]=="esp32:esp32" and p.get("installed_version")=="3.3.10" for p in platforms), "Install esp32:esp32@3.3.10 (see README)"'
     mkdir -p "$ROOT/build/firmware"

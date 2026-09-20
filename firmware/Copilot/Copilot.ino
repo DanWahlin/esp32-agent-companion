@@ -6,8 +6,10 @@
 #include <esp_system.h>
 #include <miniz.h>
 #include <SD_MMC.h>
+#include <SensorQMI8658.hpp>
 #include <mbedtls/sha256.h>
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <cstdarg>
 #include <atomic>
@@ -23,6 +25,7 @@
 #include "src/TouchInput.h"
 #include "src/SettingsMenu.h"
 #include "src/Motion.h"
+#include "src/TiltLook.h"
 #include "generated/openclaw_assets.h"
 
 using namespace copilot;
@@ -44,22 +47,185 @@ uint8_t* transferBuffer;
 std::atomic<uint32_t> droppedLogs{0};
 std::atomic<uint8_t> activeCharacter{static_cast<uint8_t>(CharacterId::Copilot)};
 std::atomic<uint8_t> selectedCharacter{static_cast<uint8_t>(CharacterId::Copilot)};
+std::atomic<uint16_t> tiltLookPacked{0};
 portMUX_TYPE openClawRenderLock = portMUX_INITIALIZER_UNLOCKED;
 uint32_t openClawRenders = 0;
 bool openClawUploadPending = false;
 uint32_t worstPresentationGap = 0;
 bool captureInterrupted = false;
+DeviceCommand tiltTestPrompt = DeviceCommand::None;
+uint64_t tiltTestInstructionUntil = 0;
+bool tiltTestInstructionDrawn = false;
 SettingsMenu settings(kBrightness);
+SensorQMI8658 imu;
+IMUdata acceleration;
+TiltLook tiltLook;
+bool tiltAvailable = false;
+bool tiltCalibrationPending = false;
 constexpr char kPreferencesNamespace[] = "agent-companion";
 constexpr char kSoundPreference[] = "sound";
 constexpr char kSoundVolumePreference[] = "volume";
 constexpr char kCharacterPreference[] = "character";
+constexpr char kTiltPreference[] = "tilt";
 
 struct ModeRequest {
   CharacterMode mode = CharacterMode::Idle;
   bool returnToIdle = false;
   int8_t character = -1;
 };
+
+void logMessage(const char* format, ...);
+
+bool isTiltTestPrompt(DeviceCommand command) {
+  return command >= DeviceCommand::TestCenter && command <= DeviceCommand::TestDone;
+}
+
+const char* tiltDirectionName(uint8_t direction) {
+  static constexpr const char* names[] = {
+      "RIGHT", "LEFT", "UP", "DOWN", "UP RIGHT", "UP LEFT", "DOWN RIGHT", "DOWN LEFT"};
+  return direction < 8 ? names[direction] : "UNKNOWN";
+}
+
+void showTiltTestInstruction(DeviceCommand prompt) {
+  const char* step = "";
+  const char* instruction = "";
+  switch (prompt) {
+    case DeviceCommand::TestCenter:
+      step = "STEP 1 / 5";
+      instruction = "HOLD START POSITION";
+      break;
+    case DeviceCommand::TestAway:
+      step = "STEP 2 / 5";
+      instruction = "TOP EDGE AWAY";
+      break;
+    case DeviceCommand::TestToward:
+      step = "STEP 3 / 5";
+      instruction = "TOP EDGE TOWARD";
+      break;
+    case DeviceCommand::TestLeft:
+      step = "STEP 4 / 5";
+      instruction = "LEFT EDGE DOWN";
+      break;
+    case DeviceCommand::TestRight:
+      step = "STEP 5 / 5";
+      instruction = "RIGHT EDGE DOWN";
+      break;
+    case DeviceCommand::TestDone:
+      step = "TILT TEST";
+      instruction = "COMPLETE";
+      break;
+    default: return;
+  }
+  display.fillScreen(0);
+  display.setTextColor(prompt == DeviceCommand::TestDone ? 0x07e0 : 0x07ff);
+  display.setTextSize(2);
+  display.setCursor(172, 172);
+  display.print(step);
+  display.setTextColor(0xffff);
+  display.setTextSize(3);
+  const int width = static_cast<int>(std::strlen(instruction)) * 18;
+  display.setCursor(std::max(12, (kDisplaySize - width) / 2), 218);
+  display.print(instruction);
+  display.setTextSize(2);
+  display.setCursor(137, 274);
+  display.print(prompt == DeviceCommand::TestCenter ? "KEEP STILL" : "HOLD UNTIL NEXT STEP");
+}
+
+void setTiltTestPrompt(DeviceCommand prompt) {
+  if (prompt == DeviceCommand::TestCancel) {
+    tiltTestPrompt = DeviceCommand::None;
+    tiltTestInstructionUntil = 0;
+    tiltTestInstructionDrawn = false;
+    display.fillScreen(0);
+    logMessage("TILT_TEST prompt=cancel\n");
+    return;
+  }
+  tiltTestPrompt = prompt;
+  tiltTestInstructionDrawn = false;
+  if (prompt == DeviceCommand::TestCenter) {
+    showTiltTestInstruction(prompt);
+    tiltTestInstructionDrawn = true;
+    tiltLook.resetCalibration();
+    for (unsigned attempt = 0;
+         attempt < TiltLook::kCalibrationSamples * 3 && !tiltLook.calibrated(); ++attempt) {
+      if (imu.getAccelerometer(acceleration.x, acceleration.y, acceleration.z))
+        tiltLook.addCalibrationSample(acceleration.x, acceleration.y);
+      delay(10);
+    }
+    if (!tiltLook.calibrated()) {
+      tiltTestPrompt = DeviceCommand::None;
+      tiltTestInstructionDrawn = false;
+      display.fillScreen(0);
+      logMessage("TILT_TEST_ERROR calibration_failed\n");
+      return;
+    }
+    tiltLookPacked.store(0, std::memory_order_relaxed);
+    logMessage("TILT_TEST_CALIBRATED bias_x=%.4f bias_y=%.4f\n",
+               tiltLook.biasX(), tiltLook.biasY());
+  }
+  tiltTestInstructionUntil = esp_timer_get_time() + 3000000;
+  logMessage("TILT_TEST prompt=%s\n", commandName(prompt) + 4);
+}
+
+uint16_t packTiltLook(const TiltLookState& look) {
+  if (!look.active) return 0;
+  const auto depth = static_cast<uint8_t>(std::clamp(
+      std::lround(look.depth * 255), 1l, 255l));
+  return static_cast<uint16_t>(0x8000u | (look.direction << 8) | depth);
+}
+
+bool initializeTiltLook(bool fadeAfterCalibration) {
+  if (!imu.begin(Wire, QMI8658_L_SLAVE_ADDRESS, kTouchSda, kTouchScl)
+      || imu.configAccelerometer(SensorQMI8658::ACC_RANGE_4G,
+                                 SensorQMI8658::ACC_ODR_1000Hz,
+                                 SensorQMI8658::LPF_MODE_0) != 0
+      || !imu.enableAccelerometer()) {
+    logMessage("IMU disabled: QMI8658 initialization failed\n");
+    return false;
+  }
+  display.fillScreen(0);
+  display.setBrightness(settings.brightness());
+  display.setTextColor(0xffff);
+  display.setTextSize(2);
+  display.setCursor(167, 211);
+  display.print("PUT ME DOWN");
+  display.setCursor(173, 241);
+  display.print("KEEP STILL");
+  for (unsigned attempt = 0;
+       attempt < TiltLook::kCalibrationSamples * 3 && !tiltLook.calibrated(); ++attempt) {
+    if (imu.getAccelerometer(acceleration.x, acceleration.y, acceleration.z))
+      tiltLook.addCalibrationSample(acceleration.x, acceleration.y);
+    delay(10);
+  }
+  if (!tiltLook.calibrated()) {
+    display.fillScreen(0);
+    display.setBrightness(fadeAfterCalibration ? 0 : settings.brightness());
+    logMessage("IMU disabled: calibration produced no stable sample set\n");
+    return false;
+  }
+  display.fillScreen(0);
+  display.setBrightness(fadeAfterCalibration ? 0 : settings.brightness());
+  logMessage("IMU ready: bias_x=%.4f bias_y=%.4f\n", tiltLook.biasX(), tiltLook.biasY());
+  return true;
+}
+
+void disableTiltLook() {
+  tiltAvailable = false;
+  tiltCalibrationPending = false;
+  tiltLook.resetCalibration();
+  tiltLookPacked.store(0, std::memory_order_relaxed);
+}
+
+void updateTiltLook() {
+  static int64_t previous = esp_timer_get_time();
+  if (!tiltAvailable || !imu.getDataReady()
+      || !imu.getAccelerometer(acceleration.x, acceleration.y, acceleration.z)) return;
+  const int64_t now = esp_timer_get_time();
+  const float elapsed = static_cast<float>(now - previous) / 1000000.0f;
+  previous = now;
+  tiltLookPacked.store(packTiltLook(tiltLook.update(
+      acceleration.x, acceleration.y, elapsed)), std::memory_order_relaxed);
+}
 
 void logMessage(const char* format, ...) {
   char message[384];
@@ -144,6 +310,11 @@ void animate(void*) {
       }
       if (motion.error()) fatal(motion.error());
     }
+    const uint16_t packedTilt = tiltLookPacked.load(std::memory_order_relaxed);
+    const bool tiltActive = (packedTilt & 0x8000u) != 0;
+    const int tiltDirection = (packedTilt >> 8) & 0x7;
+    const double tiltDepth = (packedTilt & 0xff) / 255.0;
+    if (!motion.setTiltLook(tiltActive, tiltDirection, tiltDepth)) fatal(motion.error());
     const CharacterId motionCharacter = static_cast<CharacterId>(
         activeCharacter.load(std::memory_order_relaxed));
     const double motionScale = motionCharacter == CharacterId::OpenClaw
@@ -329,6 +500,28 @@ void saveSoundVolume(uint8_t volume) {
   }
   if (preferences.putUChar(kSoundVolumePreference, volume) != 1)
     logMessage("SETTINGS_ERROR sound preference write failed\n");
+  preferences.end();
+}
+
+bool loadTiltEnabled() {
+  Preferences preferences;
+  if (!preferences.begin(kPreferencesNamespace, true)) {
+    logMessage("SETTINGS_ERROR tilt preference open failed\n");
+    return false;
+  }
+  const bool enabled = preferences.getBool(kTiltPreference, false);
+  preferences.end();
+  return enabled;
+}
+
+void saveTiltEnabled(bool enabled) {
+  Preferences preferences;
+  if (!preferences.begin(kPreferencesNamespace, false)) {
+    logMessage("SETTINGS_ERROR tilt preference open failed\n");
+    return;
+  }
+  if (preferences.putBool(kTiltPreference, enabled) != 1)
+    logMessage("SETTINGS_ERROR tilt preference write failed\n");
   preferences.end();
 }
 
@@ -578,30 +771,50 @@ void drawSettingsMenu(CharacterMode selected) {
   display.print(volume);
   display.setTextColor(text);
   display.setTextSize(2);
-  display.setCursor(185, 222);
+  display.setCursor(185, 210);
   display.print("Character");
   const CharacterId character = static_cast<CharacterId>(
       selectedCharacter.load(std::memory_order_relaxed));
-  drawSettingsButton(58, 244, 165, "Copilot", character == CharacterId::Copilot, 2, 34);
-  drawSettingsButton(243, 244, 165, openClawAvailable() ? "OpenClaw" : "No SD pack",
-                     character == CharacterId::OpenClaw, openClawAvailable() ? 2 : 1, 34);
+  drawSettingsButton(58, 232, 165, "Copilot", character == CharacterId::Copilot, 2, 32);
+  drawSettingsButton(243, 232, 165, openClawAvailable() ? "OpenClaw" : "No SD pack",
+                     character == CharacterId::OpenClaw, openClawAvailable() ? 2 : 1, 32);
   display.setTextColor(text);
   display.setTextSize(2);
-  display.setCursor(143, 286);
+  display.setCursor(70, 276);
+  display.print("Tilt gaze");
+  drawSettingsButton(268, 270, 140, settings.tiltEnabled() ? "On" : "Off",
+                     settings.tiltEnabled(), 2, 30);
+  display.setTextColor(text);
+  display.setTextSize(2);
+  display.setCursor(143, 304);
   display.print("Character state");
-  drawSettingsButton(58, 306, 165, "Idle", selected == CharacterMode::Idle, 2, 34);
-  drawSettingsButton(243, 306, 165, "Working", selected == CharacterMode::Working, 2, 34);
-  drawSettingsButton(58, 344, 165, "Complete", selected == CharacterMode::Complete, 2, 34);
-  drawSettingsButton(243, 344, 165, "Needs attention",
-                     selected == CharacterMode::Attention, 1, 34);
-  drawSettingsButton(58, 382, 165, "Surprise", selected == CharacterMode::Surprise, 2, 34);
-  drawSettingsButton(243, 382, 165, "Close", false, 2, 34);
+  drawSettingsButton(58, 324, 165, "Idle", selected == CharacterMode::Idle, 2, 28);
+  drawSettingsButton(243, 324, 165, "Working", selected == CharacterMode::Working, 2, 28);
+  drawSettingsButton(58, 354, 165, "Complete", selected == CharacterMode::Complete, 2, 28);
+  drawSettingsButton(243, 354, 165, "Needs attention",
+                     selected == CharacterMode::Attention, 1, 28);
+  drawSettingsButton(58, 384, 165, "Surprise", selected == CharacterMode::Surprise, 2, 28);
+  drawSettingsButton(243, 384, 165, "Close", false, 2, 28);
 }
 
 void clearCharacterMargins() {
   display.fillRect(0, 0, kCharacterFrameX, kDisplaySize, 0);
   display.fillRect(kCharacterFrameX + kCharacterFrameWidth, 0,
                    kDisplaySize - kCharacterFrameX - kCharacterFrameWidth, kDisplaySize, 0);
+}
+
+void closeSettings(const char* source) {
+  settings.close();
+  queueAudioCue(AudioCue::Settings);
+  clearCharacterMargins();
+  logMessage("SETTINGS closed=%s\n", source);
+  if (!tiltCalibrationPending) return;
+  tiltCalibrationPending = false;
+  tiltAvailable = initializeTiltLook(false);
+  if (!tiltAvailable) {
+    settings.setTiltEnabled(false);
+    saveTiltEnabled(false);
+  }
 }
 
 void handleTouchGesture(const TouchGesture& gesture, const Frame& frame) {
@@ -613,10 +826,7 @@ void handleTouchGesture(const TouchGesture& gesture, const Frame& frame) {
     return;
   }
   if (gesture.kind == TouchGestureKind::SwipeDown && settings.isOpen()) {
-    settings.close();
-    queueAudioCue(AudioCue::Settings);
-    clearCharacterMargins();
-    logMessage("SETTINGS closed=swipe\n");
+    closeSettings("swipe");
     return;
   }
   if (gesture.kind != TouchGestureKind::Tap) return;
@@ -647,6 +857,20 @@ void handleTouchGesture(const TouchGesture& gesture, const Frame& frame) {
       logMessage("SETTINGS sound_volume=%u\n",
                  static_cast<unsigned>(settings.soundVolume()));
       break;
+    case SettingsAction::ToggleTilt:
+      saveTiltEnabled(settings.tiltEnabled());
+      if (settings.tiltEnabled()) {
+        disableTiltLook();
+        tiltCalibrationPending = true;
+      } else {
+        disableTiltLook();
+      }
+      queueAudioCue(AudioCue::Settings);
+      drawSettingsMenu(frame.state.requestedMode);
+      logMessage("SETTINGS tilt=%u pending_calibration=%u\n",
+                 static_cast<unsigned>(settings.tiltEnabled()),
+                 static_cast<unsigned>(tiltCalibrationPending));
+      break;
     case SettingsAction::CharacterCopilot:
       queueCharacter(CharacterId::Copilot, frame.state.requestedMode);
       queueAudioCue(AudioCue::Settings);
@@ -658,20 +882,17 @@ void handleTouchGesture(const TouchGesture& gesture, const Frame& frame) {
       drawSettingsMenu(frame.state.requestedMode);
       break;
     case SettingsAction::Idle:
-      settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Idle); break;
+      closeSettings("state"); queueMode(DeviceCommand::Idle); break;
     case SettingsAction::Surprise:
-      settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Surprise); break;
+      closeSettings("state"); queueMode(DeviceCommand::Surprise); break;
     case SettingsAction::Working:
-      settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Working); break;
+      closeSettings("state"); queueMode(DeviceCommand::Working); break;
     case SettingsAction::Complete:
-      settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Complete); break;
+      closeSettings("state"); queueMode(DeviceCommand::Complete); break;
     case SettingsAction::Attention:
-      settings.close(); clearCharacterMargins(); queueMode(DeviceCommand::Attention); break;
+      closeSettings("state"); queueMode(DeviceCommand::Attention); break;
     case SettingsAction::Close:
-      settings.close();
-      queueAudioCue(AudioCue::Settings);
-      clearCharacterMargins();
-      logMessage("SETTINGS closed=button\n");
+      closeSettings("button");
       break;
     case SettingsAction::None: break;
   }
@@ -695,15 +916,25 @@ void processCommand(DeviceCommand command, const Frame& frame) {
       break;
     case DeviceCommand::Info:
       logMessage("INFO protocol=%u uptime_ms=%llu reset_reason=%u mode=%s requested=%s assets=%u "
-                 "max_gap_us=%u dropped_logs=%u audio_ready=%u sound_volume=%u character=%s\n",
+                 "max_gap_us=%u dropped_logs=%u audio_ready=%u sound_volume=%u character=%s tilt=%u\n",
                     kDeviceProtocol, static_cast<unsigned long long>(esp_timer_get_time() / 1000),
                     static_cast<unsigned>(esp_reset_reason()), modeName(frame.state.mode),
                     modeName(frame.state.requestedMode), kSpriteDataSize, worstPresentationGap,
                     droppedLogs.load(std::memory_order_relaxed), static_cast<unsigned>(audioReady()),
                     static_cast<unsigned>(soundVolume()),
                     characterName(static_cast<CharacterId>(
-                        activeCharacter.load(std::memory_order_relaxed))));
+                        activeCharacter.load(std::memory_order_relaxed))),
+                    static_cast<unsigned>(tiltAvailable));
       logSdStatus(sdSpriteStatus());
+      break;
+    case DeviceCommand::TestCenter:
+    case DeviceCommand::TestAway:
+    case DeviceCommand::TestToward:
+    case DeviceCommand::TestLeft:
+    case DeviceCommand::TestRight:
+    case DeviceCommand::TestDone:
+    case DeviceCommand::TestCancel:
+      setTiltTestPrompt(command);
       break;
     case DeviceCommand::UploadOpenClaw:
       installOpenClawFromUsb();
@@ -728,6 +959,13 @@ void setup() {
   if (!initializeSpriteStorage()) fatal(spriteStorageError());
   initializeSdSpriteStorage();
   if (!initializeTouchInput()) fatal(touchInputError());
+  const bool storedTiltEnabled = loadTiltEnabled();
+  settings.setTiltEnabled(storedTiltEnabled);
+  tiltAvailable = storedTiltEnabled && initializeTiltLook(true);
+  if (storedTiltEnabled && !tiltAvailable) {
+    settings.setTiltEnabled(false);
+    saveTiltEnabled(false);
+  }
   const uint8_t storedSoundVolume = loadSoundVolume();
   settings.setSoundVolume(storedSoundVolume);
   setSoundVolume(storedSoundVolume);
@@ -816,7 +1054,18 @@ void loop() {
   }
   previousPresentation = start;
   uint32_t transferUs = 0;
-  if (!settings.isOpen()) {
+  const bool showingTiltInstruction = isTiltTestPrompt(tiltTestPrompt)
+      && esp_timer_get_time() < tiltTestInstructionUntil;
+  if (showingTiltInstruction) {
+    if (!tiltTestInstructionDrawn) {
+      showTiltTestInstruction(tiltTestPrompt);
+      tiltTestInstructionDrawn = true;
+    }
+  } else if (!settings.isOpen()) {
+    if (tiltTestInstructionDrawn) {
+      display.fillScreen(0);
+      tiltTestInstructionDrawn = false;
+    }
     display.startWrite();
     display.writeAddrWindow(kCharacterFrameX, 0, kCharacterFrameWidth, kCharacterFrameHeight);
     const auto* bytes = reinterpret_cast<const uint8_t*>(frame->pixels);
@@ -836,6 +1085,7 @@ void loop() {
   TouchGesture gesture;
   if (pollTouchGesture(gesture)) handleTouchGesture(gesture, *frame);
   if (touchInputError()) fatal(touchInputError());
+  updateTiltLook();
   processCommand(commandParser.expire(esp_timer_get_time() / 1000), *frame);
   for (unsigned read = 0; read < 8 && Serial.available(); ++read) {
     processCommand(commandParser.feed(static_cast<char>(Serial.read()), esp_timer_get_time() / 1000), *frame);
@@ -858,6 +1108,18 @@ void loop() {
   const auto timing = *frame;
   xQueueSend(freeFrames, &frame, portMAX_DELAY);
   const uint64_t now = esp_timer_get_time();
+  static uint64_t lastTiltTestReport = 0;
+  if (isTiltTestPrompt(tiltTestPrompt) && now - lastTiltTestReport >= 500000) {
+    const auto tilt = tiltLook.state();
+    logMessage("TILT_TEST_SAMPLE prompt=%s active=%u direction=%u direction_name=%s depth=%.3f "
+               "screen_x=%.4f screen_y=%.4f magnitude=%.4f pose_direction=%u pose_frame=%u\n",
+               commandName(tiltTestPrompt) + 4, static_cast<unsigned>(tilt.active),
+               static_cast<unsigned>(tilt.direction), tiltDirectionName(tilt.direction), tilt.depth,
+               tiltLook.screenX(), tiltLook.screenY(), tiltLook.magnitude(),
+               static_cast<unsigned>(timing.state.pose.direction),
+               static_cast<unsigned>(timing.state.pose.index));
+    lastTiltTestReport = now;
+  }
   if (now - lastReport >= 5000000) {
     if (Serial) {
       logMessage("PERF fps=%.1f render=%.2fms transfer=%.2fms max_render=%.2fms free_psram=%u dropped_logs=%u\n",
@@ -869,6 +1131,13 @@ void loop() {
                     timing.inflateUs, timing.predictUs);
       logMessage("PACING min_gap_us=%u max_gap_us=%u\n",
                     minGap == UINT32_MAX ? 0 : minGap, maxGap);
+      const auto tilt = tiltLook.state();
+      logMessage("TILT ready=%u raw_x=%.4f raw_y=%.4f bias_x=%.4f bias_y=%.4f "
+                    "screen_x=%.4f screen_y=%.4f magnitude=%.4f active=%u direction=%u depth=%.3f\n",
+                    static_cast<unsigned>(tiltAvailable), acceleration.x, acceleration.y,
+                    tiltLook.biasX(), tiltLook.biasY(), tiltLook.screenX(), tiltLook.screenY(),
+                    tiltLook.magnitude(), static_cast<unsigned>(tilt.active),
+                    static_cast<unsigned>(tilt.direction), tilt.depth);
       constexpr uint32_t internalCaps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
       // ESP-IDF reports stack high-water marks in bytes, unlike vanilla FreeRTOS.
       logMessage("MEM free_internal=%u min_internal=%u largest_internal=%u free_psram=%u "

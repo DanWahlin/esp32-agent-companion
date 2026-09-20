@@ -63,6 +63,7 @@ bool CharacterMotion::setMode(CharacterMode mode) {
   ++eventId_;
   effectSeconds_ = 0;
   idleSeconds_ = 0;
+  if (mode != CharacterMode::Idle) idle_.clearGuide();
   if (mode_ == CharacterMode::Sleep && mode != CharacterMode::Sleep) {
     sleepExiting_ = true;
     sleepTransitionSeconds_ = 0;
@@ -98,6 +99,23 @@ bool CharacterMotion::requestIdleDirection(int direction) {
     return false;
   }
   idle_.setAutomatic(true);
+  error_ = nullptr;
+  return true;
+}
+
+bool CharacterMotion::setTiltLook(bool active, int direction, double depth) {
+  if (mode_ == CharacterMode::Sleep && active && next_ == CharacterMode::Sleep) {
+    if (!setMode(CharacterMode::Idle)) return false;
+  }
+  if (mode_ != CharacterMode::Idle || next_ != CharacterMode::Idle) return true;
+  if (active) {
+    if (!idle_.guide(direction, depth)) {
+      error_ = idle_.error();
+      return false;
+    }
+  } else {
+    idle_.clearGuide();
+  }
   error_ = nullptr;
   return true;
 }

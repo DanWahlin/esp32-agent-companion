@@ -33,6 +33,8 @@ class SpriteMotion {
   void setEased(bool value) { eased_ = value; }
   bool setDuration(double value);
   bool setSpeed(double value);
+  bool guide(int direction, double depth);
+  void clearGuide();
   // Fixed FIFO: invalid directions/full queues return false without dropping work.
   // Failed controls set error(); a successful bool control clears it.
   bool request(int direction, double depth = 1);
@@ -51,6 +53,7 @@ class SpriteMotion {
   double blinkElapsed() const { return blinkElapsed_; }
   double blinkWait() const { return blinkWait_; }
   bool doublePending() const { return doublePending_; }
+  bool guided() const { return guided_; }
   size_t queued() const { return queueSize_; }
 
  private:
@@ -81,6 +84,9 @@ class SpriteMotion {
   bool blinks_ = true;
   bool blinkQueued_ = false;
   bool doublePending_ = false;
+  bool guided_ = false;
+  uint8_t guidedDirection_ = 0;
+  double guidedDepth_ = 1;
   uint8_t cycleIndex_ = 0;
   struct Request {
     uint8_t direction = 0;

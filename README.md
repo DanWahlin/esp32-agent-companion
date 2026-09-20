@@ -18,6 +18,9 @@ built-in character.
 
 - **Natural motion:** smooth display presentation, eight looking directions, and occasional
   blinks. OpenClaw uses a character-specific 12 FPS walking cycle for responsive motion.
+- **Optional motion-aware gaze:** enable **Tilt gaze** in Settings to have the
+  Idle face counter-rotate as you tilt the device, then resume autonomous
+  looking when returned to its calibrated resting position.
 - **Touch reactions:** tap the character for a quick spring-like recoil and widened eyes,
   then return to Idle.
 - **On-device settings:** swipe up to adjust brightness, sound, character, or state.
@@ -36,6 +39,33 @@ built-in character.
 The character works immediately in automatic Idle mode. Agent states can be
 controlled through USB serial commands, the swipe-up settings menu, or the
 included Copilot CLI daemon. Wireless daemon transports are not implemented.
+
+Tilt gaze is disabled by default. Swipe up to open Settings, switch **Tilt gaze**
+to **On**, then close Settings. The device immediately shows
+**PUT ME DOWN / KEEP STILL** for about two seconds and uses its resting-on-a-surface
+orientation as neutral. The preference persists; later startups recalibrate automatically
+when Tilt gaze remains enabled. Tilt guidance uses the existing eight-direction
+artwork only while Idle. Working, Needs attention, Complete, Surprise, settings,
+and explicit USB commands retain priority. Switching Tilt gaze off disables the
+sensor response immediately. If the QMI8658 is unavailable, the firmware logs
+the problem, switches the setting back off, and continues with automatic Idle
+motion.
+
+For a guided hardware check, run the finite on-device tilt test through the
+installed daemon:
+
+```bash
+cd daemon
+node dist/src/cli.js tilt-test center
+node dist/src/cli.js status
+```
+
+The AMOLED shows each requested instruction for three seconds, then returns to
+the live face so its response can be observed without watching the host. Valid
+prompts are `center`, `away`, `toward`, `left`, `right`, `done`, and `cancel`.
+During the test, the daemon status includes the latest measured vector and the
+actual rendered sprite pose. This diagnostic uses only fixed commands and does
+not expose arbitrary serial writes.
 
 ### Optional: Copilot CLI companion daemon
 
@@ -95,6 +125,29 @@ elicitation prompts to Needs attention, verified tool-using turns to Complete,
 and inactive sessions to Idle. Multiple CLI sessions are aggregated rather than
 overwriting one another. Timestamped leases discard abandoned work, while a
 private local state file restores still-active sessions after a daemon restart.
+
+### Optional: GitHub Copilot app plugin
+
+An installable Agent Plugins 1.0 prototype lives in
+[`plugins/copilot-app-companion`](plugins/copilot-app-companion). It adds a local
+stdio MCP server and focused skill for device status, connection testing, and
+validated state changes. The plugin always talks to the daemon; it never opens a
+second serial connection, so app activity aggregates with existing Copilot CLI
+sessions.
+
+Install the daemon first using the commands above. In the app, open
+**Customize** > **Plugins**, add `bradygaster/esp32-agent-companion` as a custom
+marketplace, then install `esp32-agent-companion`. The equivalent CLI flow is:
+
+```bash
+copilot plugin marketplace add bradygaster/esp32-agent-companion
+copilot plugin install esp32-agent-companion@esp32-agent-companion
+```
+
+Restart the GitHub Copilot app and verify the plugin under **Customize** >
+**Installed**. See the [plugin README](plugins/copilot-app-companion/README.md)
+for local development, uninstall steps, MCP tool behavior, and the current app
+lifecycle automation limitation.
 
 <p align="center">
   <img src="preview/agent-companion-demo.gif" alt="ESP32 Agent Companion cycling through Idle, Surprise, Working, Needs attention, and Complete states" width="400">

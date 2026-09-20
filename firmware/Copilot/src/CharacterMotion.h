@@ -25,6 +25,7 @@ class CharacterMotion {
   void surprise();
   void surpriseToIdle();
   bool requestIdleDirection(int direction);
+  bool setTiltLook(bool active, int direction = 0, double depth = 1);
   CharacterState state() const;
   const char* error() const { return error_; }
   void setPlaying(bool value) { playing_ = value; }
