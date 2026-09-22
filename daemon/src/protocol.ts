@@ -1,6 +1,24 @@
 export const characterStates = ['idle', 'surprise', 'working', 'complete', 'attention'] as const;
 export type CharacterState = typeof characterStates[number];
 
+export const tiltTestPrompts = [
+  'center', 'away', 'toward', 'left', 'right', 'done', 'cancel',
+] as const;
+export type TiltTestPrompt = typeof tiltTestPrompts[number];
+
+export interface TiltTestSample {
+  prompt: Exclude<TiltTestPrompt, 'cancel'>;
+  active: boolean;
+  direction: number;
+  directionName: string;
+  depth: number;
+  screenX: number;
+  screenY: number;
+  magnitude: number;
+  poseDirection: number;
+  poseFrame: number;
+}
+
 export const hookEvents = [
   'sessionStart',
   'userPromptSubmitted',
@@ -39,6 +57,9 @@ export interface HookPayload {
 export type DaemonRequest =
   | {type: 'hook'; event: HookEvent; payload: HookPayload}
   | {type: 'send'; state: CharacterState}
+  | {type: 'lease'; leaseId: string; state: CharacterState}
+  | {type: 'tiltTest'; prompt: TiltTestPrompt}
+  | {type: 'test'}
   | {type: 'status'};
 
 export interface DaemonStatus {
@@ -47,4 +68,5 @@ export interface DaemonStatus {
   connected: boolean;
   port: string | null;
   sessions: number;
+  tiltTest: TiltTestSample | null;
 }

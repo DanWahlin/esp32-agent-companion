@@ -146,6 +146,41 @@ static void modesAndInterruptions() {
   for (int i = 0; i < 400; ++i) { step(p); assert(p.state().mode != Mode::Surprise); }
 }
 
+static void tiltGuidesOnlyIdleAndWakesSleep() {
+  CharacterMotion motion(42, 13);
+  assert(motion.setTiltLook(true, 6, .5));
+  for (int i = 0; i < 1000 && motion.state().pose.index != 12; ++i) {
+    assert(motion.setTiltLook(true, 6, .5));
+    step(motion);
+  }
+  assert(motion.state().pose.direction == 6 && motion.state().pose.index == 12);
+  for (int i = 0; i < 120; ++i) {
+    step(motion);
+    assert(motion.state().pose.direction == 6 && motion.state().pose.index == 12);
+  }
+  assert(motion.setMode(Mode::Working));
+  until(motion, [](const auto& state) { return state.mode == Mode::Working; });
+  for (int i = 0; i < 120; ++i) {
+    assert(motion.setTiltLook(true, 2, 1));
+    step(motion);
+    assert(motion.state().mode == Mode::Working);
+  }
+  assert(motion.setMode(Mode::Idle));
+  until(motion, [](const auto& state) { return state.mode == Mode::Idle; });
+  assert(motion.setTiltLook(false));
+  until(motion, [](const auto& state) { return state.pose.index == 0; });
+
+  constexpr double dt = 1.0 / 30;
+  for (int tick = 0; tick < static_cast<int>(
+       CharacterMotion::kIdleBeforeSleepSeconds / dt) + 500; ++tick) {
+    step(motion, dt);
+    if (motion.state().mode == Mode::Sleep) break;
+  }
+  assert(motion.state().mode == Mode::Sleep);
+  assert(motion.setTiltLook(true, 0, .6));
+  until(motion, [](const auto& state) { return state.mode == Mode::Idle; });
+}
+
 static void pauseErrorsAndLongRun() {
   CharacterMotion unavailable(0, 8);
   assert(!unavailable.setMode(Mode::Attention) && unavailable.error());
@@ -482,6 +517,7 @@ int main(int argc, char**) {
   if (argc > 1) { benchmarkEffects(); return 0; }
   idleParityAndCentering();
   modesAndInterruptions();
+  tiltGuidesOnlyIdleAndWakesSleep();
   pauseErrorsAndLongRun();
   blinkSafeExpressionEntry();
   workingLooksStayBusy();

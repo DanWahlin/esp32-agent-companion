@@ -1,5 +1,5 @@
 import {SerialPort} from 'serialport';
-import type {CharacterState} from './protocol.js';
+import type {CharacterState, TiltTestPrompt, TiltTestSample} from './protocol.js';
 
 interface LineWaiter {
   match: (line: string) => boolean;
@@ -18,6 +18,7 @@ export class UsbTransport {
   #buffer = '';
   #waiters: LineWaiter[] = [];
   #commands = Promise.resolve();
+  #tiltTestSample: TiltTestSample | null = null;
 
   get connected(): boolean {
     return this.#port?.isOpen === true;
@@ -29,6 +30,10 @@ export class UsbTransport {
 
   get state(): CharacterState {
     return this.#desired;
+  }
+
+  get tiltTestSample(): TiltTestSample | null {
+    return this.#tiltTestSample;
   }
 
   start(): void {
@@ -50,9 +55,25 @@ export class UsbTransport {
 
   setState(state: CharacterState): void {
     this.#desired = state;
-    this.#commands = this.#commands
-      .then(() => this.#sendState(state))
-      .catch(error => console.error(`[usb] ${this.#message(error)}`));
+    if (!this.connected) return;
+    void this.#queueState(state).catch(() => undefined);
+  }
+
+  async setStateConfirmed(state: CharacterState): Promise<void> {
+    this.#desired = state;
+    if (!this.connected) throw new Error('USB device is not connected.');
+    await this.#queueState(state);
+  }
+
+  async sendTransientState(state: CharacterState): Promise<void> {
+    if (!this.connected) throw new Error('USB device is not connected.');
+    await this.#queueState(state);
+  }
+
+  async setTiltTestPrompt(prompt: TiltTestPrompt): Promise<void> {
+    if (!this.connected) throw new Error('USB device is not connected.');
+    await this.#request(`!test${prompt}\n`, line => line === `TILT_TEST prompt=${prompt}`);
+    if (prompt === 'cancel') this.#tiltTestSample = null;
   }
 
   async #scan(): Promise<void> {
@@ -113,9 +134,17 @@ export class UsbTransport {
   }
 
   async #sendState(state: CharacterState): Promise<void> {
-    if (!this.connected) return;
+    if (!this.connected) throw new Error('USB device is not connected.');
     await this.#request(`!${state}\n`, line => line === `COMMAND accepted=${state}`);
     console.log(`[state] ${state} via usb`);
+  }
+
+  #queueState(state: CharacterState): Promise<void> {
+    const result = this.#commands.then(() => this.#sendState(state));
+    this.#commands = result.catch(error => {
+      console.error(`[usb] ${this.#message(error)}`);
+    });
+    return result;
   }
 
   async #request(text: string, match: (line: string) => boolean): Promise<string> {
@@ -155,7 +184,13 @@ export class UsbTransport {
       this.#buffer = this.#buffer.slice(newline + 1);
       if (!line) continue;
       const waiter = this.#waiters.find(candidate => candidate.match(line));
-      if (!waiter) continue;
+      if (!waiter) {
+        const sample = parseTiltTestSample(line);
+        if (sample) this.#tiltTestSample = sample;
+        if (line.startsWith('TILT ') || line.startsWith('POSE ')
+            || line.startsWith('TILT_TEST')) console.log(`[device] ${line}`);
+        continue;
+      }
       clearTimeout(waiter.timer);
       this.#waiters.splice(this.#waiters.indexOf(waiter), 1);
       waiter.resolve(line);
@@ -193,4 +228,21 @@ export function isLikelyEsp32Port(
     path: string, platform: NodeJS.Platform = process.platform): boolean {
   if (platform === 'darwin') return /^\/dev\/(?:cu|tty)\.usbmodem/i.test(path);
   return /^\/dev\/tty(?:ACM|USB)\d+$/i.test(path);
+}
+
+export function parseTiltTestSample(line: string): TiltTestSample | null {
+  const match = /^TILT_TEST_SAMPLE prompt=(center|away|toward|left|right|done) active=([01]) direction=(\d+) direction_name=([A-Z ]+) depth=([\d.]+) screen_x=(-?[\d.]+) screen_y=(-?[\d.]+) magnitude=([\d.]+) pose_direction=(\d+) pose_frame=(\d+)$/.exec(line);
+  if (!match) return null;
+  return {
+    prompt: match[1] as TiltTestSample['prompt'],
+    active: match[2] === '1',
+    direction: Number(match[3]),
+    directionName: match[4]!,
+    depth: Number(match[5]),
+    screenX: Number(match[6]),
+    screenY: Number(match[7]),
+    magnitude: Number(match[8]),
+    poseDirection: Number(match[9]),
+    poseFrame: Number(match[10]),
+  };
 }

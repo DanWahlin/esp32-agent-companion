@@ -81,6 +81,42 @@ bool SpriteMotion::setSpeed(double value) {
   return valid();
 }
 
+bool SpriteMotion::guide(int direction, double depth) {
+  if (!valid()) return fail(kInvalidCount);
+  if (direction < 0 || direction >= 8) return fail("Unknown sprite direction.");
+  if (!std::isfinite(depth) || depth <= 0 || depth > 1)
+    return fail("Sprite direction depth must be between zero and one.");
+  guided_ = true;
+  guidedDirection_ = static_cast<uint8_t>(direction);
+  guidedDepth_ = depth;
+  automatic_ = cycling_ = false;
+  queueHead_ = queueSize_ = 0;
+  pose_.direction = guidedDirection_;
+  const int limit = std::max(1, (direction == 2 || direction == 3)
+      ? (count_ - 1) / 2 : count_ - 1);
+  target_ = static_cast<uint8_t>(std::max(1.0, std::round(depth * limit)));
+  pose_.index = target_;
+  phase_ = Phase::Endpoint;
+  hold_ = progress_ = 0;
+  clearError();
+  return true;
+}
+
+void SpriteMotion::clearGuide() {
+  if (!guided_) return;
+  guided_ = false;
+  if (pose_.index) {
+    target_ = std::max<uint8_t>(1, pose_.index);
+    phase_ = Phase::Return;
+    progress_ = 0;
+  } else {
+    phase_ = Phase::Center;
+    hold_ = .35;
+    progress_ = 0;
+  }
+  setAutomatic(true);
+}
+
 bool SpriteMotion::request(int direction, double depth) {
   if (!valid()) return fail(kInvalidCount);
   if (direction < 0 || direction >= 8) return fail("Unknown sprite direction.");
@@ -109,7 +145,10 @@ bool SpriteMotion::returnToCenter(double duration) {
 void SpriteMotion::startTurn() {
   uint8_t direction;
   double depth = 1;
-  if (queueSize_) {
+  if (guided_) {
+    direction = guidedDirection_;
+    depth = guidedDepth_;
+  } else if (queueSize_) {
     const Request request = queue_[queueHead_];
     direction = request.direction;
     depth = request.depth;
@@ -190,6 +229,7 @@ void SpriteMotion::update(double deltaSeconds) {
   // Blinking is independent: it must never add a dwell to the head timeline.
   updateBlink(std::min(dt, kMaxDelta));
   if (phase_ == Phase::Center || phase_ == Phase::Endpoint) {
+    if (phase_ == Phase::Endpoint && guided_) return;
     progress_ += dt / hold_;
     if (progress_ < 1) return;
     progress_ = 0;

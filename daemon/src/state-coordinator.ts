@@ -76,6 +76,27 @@ export class StateCoordinator {
     return this.#sessions.size;
   }
 
+  setLeaseState(leaseId: string, state: CharacterState): boolean {
+    const payload = {sessionId: `lease:${leaseId}`, timestamp: this.#now()};
+    switch (state) {
+      case 'working':
+        return this.handle('preToolUse', payload);
+      case 'attention':
+        return this.handle('notification', payload);
+      case 'complete':
+        this.handle('preToolUse', payload);
+        return this.handle('agentStop', payload);
+      case 'idle':
+        this.#cancelComplete();
+        return this.handle('sessionEnd', payload);
+      case 'surprise':
+        return false;
+      default:
+        state satisfies never;
+        return false;
+    }
+  }
+
   handle(event: HookEvent, payload: HookPayload): boolean {
     const now = this.#now();
     const occurredAt = this.#eventTime(payload, now);

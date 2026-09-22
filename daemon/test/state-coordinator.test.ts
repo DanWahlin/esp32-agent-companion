@@ -257,3 +257,26 @@ test('does not celebrate a turn that performed no work', () => {
   assert.deepEqual(states, ['working', 'idle']);
   coordinator.close();
 });
+
+test('maps external leases onto aggregate states and releases them', () => {
+  const {coordinator, states} = fixture({completeMs: 5});
+  assert.equal(coordinator.setLeaseState('copilot-app:test', 'working'), true);
+  assert.equal(coordinator.state, 'working');
+  assert.equal(coordinator.setLeaseState('copilot-app:test', 'attention'), true);
+  assert.equal(coordinator.state, 'attention');
+  assert.equal(coordinator.setLeaseState('copilot-app:test', 'complete'), true);
+  assert.equal(coordinator.state, 'complete');
+  assert.equal(coordinator.setLeaseState('copilot-app:test', 'idle'), true);
+  assert.equal(coordinator.state, 'idle');
+  assert.deepEqual(states, ['working', 'attention', 'working', 'complete', 'idle']);
+  coordinator.close();
+});
+
+test('expires an abandoned external work lease', () => {
+  const {coordinator, advance} = fixture({activeLeaseMs: 100});
+  coordinator.setLeaseState('copilot-app:test', 'working');
+  advance(101);
+  coordinator.sweep();
+  assert.equal(coordinator.state, 'idle');
+  coordinator.close();
+});

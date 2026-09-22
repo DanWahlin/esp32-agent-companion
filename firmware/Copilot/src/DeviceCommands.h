@@ -6,7 +6,8 @@
 namespace copilot {
 enum class DeviceCommand {
   None, Invalid, Capture, Heap, Info, UploadOpenClaw,
-  Idle, Surprise, Working, Complete, Attention
+  Idle, Surprise, Working, Complete, Attention,
+  TestCenter, TestAway, TestToward, TestLeft, TestRight, TestDone, TestCancel
 };
 constexpr unsigned kDeviceProtocol = 2;
 
@@ -17,6 +18,13 @@ inline const char* commandName(DeviceCommand command) {
     case DeviceCommand::Working: return "working";
     case DeviceCommand::Complete: return "complete";
     case DeviceCommand::Attention: return "attention";
+    case DeviceCommand::TestCenter: return "testcenter";
+    case DeviceCommand::TestAway: return "testaway";
+    case DeviceCommand::TestToward: return "testtoward";
+    case DeviceCommand::TestLeft: return "testleft";
+    case DeviceCommand::TestRight: return "testright";
+    case DeviceCommand::TestDone: return "testdone";
+    case DeviceCommand::TestCancel: return "testcancel";
     default: return "invalid";
   }
 }
@@ -44,7 +52,11 @@ class DeviceCommands {
       if (invalid_) return DeviceCommand::Invalid;
       text_[length_] = '\0';
       for (DeviceCommand command : {DeviceCommand::Idle, DeviceCommand::Surprise, DeviceCommand::Working,
-                                     DeviceCommand::Complete, DeviceCommand::Attention}) {
+                                     DeviceCommand::Complete, DeviceCommand::Attention,
+                                     DeviceCommand::TestCenter, DeviceCommand::TestAway,
+                                     DeviceCommand::TestToward, DeviceCommand::TestLeft,
+                                     DeviceCommand::TestRight, DeviceCommand::TestDone,
+                                     DeviceCommand::TestCancel}) {
         if (std::strcmp(text_, commandName(command)) == 0) return command;
       }
       return DeviceCommand::Invalid;
